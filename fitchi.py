@@ -1846,26 +1846,6 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
     def get_number_of_invariable_sites(self, pop=None):
         return self.get_alignment_length()-self.get_number_of_variable_sites(pop)
 
-    def get_proportion_of_invariable_sites(self, pop=None):
-        return self.get_number_of_invariable_sites(pop)/self.get_alignment_length() 
-
-    def get_number_of_completely_undetermined_bases(self, pop=None):
-        number_of_completely_undetermined_bases = 0
-        for x in range(0,self.get_alignment_length()):
-            for y in range(0,len(self)):
-                if pop == None or pop in self[y].id:
-                    if self[y].seq[x] is 'N' or self[y].seq[x] is '-' or self[y].seq[x] is '?':
-                        number_of_completely_undetermined_bases += 1
-        return number_of_completely_undetermined_bases
-
-    def get_proportion_of_completely_undetermined_bases(self, pop=None):
-        n_records_for_this_pop = 0
-        for y in range(0,len(self)):
-            if pop == None or pop in self[y].id:
-                n_records_for_this_pop += 1
-        undetermined = self.get_number_of_completely_undetermined_bases(pop)
-        return undetermined/(self.get_alignment_length()*n_records_for_this_pop)
-
     def get_alleles(self, x, pop=None):
         alleles = []
         for y in range(0,len(self)):
@@ -1901,23 +1881,6 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
                     alleles.append('A')
                     alleles.append('C')
         return alleles
-
-    def get_mean_expected_heterozygousity(self, pop=None):
-        heterozygosities = []
-        for x in range(0,self.get_alignment_length()):
-            alleles = self.get_alleles(x, pop)
-            unique_alleles = list(set(alleles))
-            if len(unique_alleles) == 1:
-                heterozygosities.append(0)
-            elif len(unique_alleles) == 2:
-                p = alleles.count(unique_alleles[0])/len(alleles)
-                q = alleles.count(unique_alleles[1])/len(alleles)
-                # Following http://www.uwyo.edu/dbmcd/popecol/maylects/fst.html:
-                heterozygosities.append(1 - (p**2 + q**2))
-        if len(heterozygosities) > 0:
-            return sum(heterozygosities)/len(heterozygosities)
-        else:
-            return None
 
     def get_F_st(self, pops=[]):
         if len(pops) != 2:
