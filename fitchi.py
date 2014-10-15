@@ -1811,14 +1811,19 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
                     unique_map = False
             return unique_map
 
-    def get_number_of_variable_sites(self, pop=None):
+    def get_number_of_variable_sites(self, pops=[]):
         # Find the first sequence of this population.
         first_included_seq = None
         record_index = -1
         while first_included_seq == None and record_index < len(self)-1:
             record_index += 1
-            if pop == None or pop in self[record_index].id:
+            if pops == []:
                 first_included_seq = self[record_index].seq
+            else:
+                for pop in pops:
+                    if pop in self[record_index].id:
+                        first_included_seq = self[record_index].seq
+                        break
         if first_included_seq == None:
             return 0
         else:
@@ -1826,10 +1831,16 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
             number_of_variable_sites = 0
             for x in range(0,self.get_alignment_length()):
                 for y in range(1,len(self)):
-                    if pop == None or pop in self[y].id:
+                    if pops == []:
                         if self[y].seq[x] is not first_included_seq[x]:
                             number_of_variable_sites += 1
                             break
+                    else:
+                        for pop in pops:
+                            if pop in self[y].id:
+                                if self[y].seq[x] is not first_included_seq[x]:
+                                    number_of_variable_sites += 1
+                                    break
             # Return.
             return number_of_variable_sites
 
@@ -1840,144 +1851,315 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
                 seqs.append(str(record.seq))
         return len(set(seqs))
 
-    def get_proportion_of_variable_sites(self, pop=None):
-        return self.get_number_of_variable_sites(pop)/self.get_alignment_length()
+    def get_proportion_of_variable_sites(self, pops=[]):
+        return self.get_number_of_variable_sites(pops)/self.get_alignment_length()
 
-    def get_number_of_invariable_sites(self, pop=None):
-        return self.get_alignment_length()-self.get_number_of_variable_sites(pop)
+    def get_number_of_invariable_sites(self, pops=[]):
+        return self.get_alignment_length()-self.get_number_of_variable_sites(pops)
 
-    def get_alleles(self, x, pop=None):
-        alleles = []
-        for y in range(0,len(self)):
-            if pop == None or pop in self[y].id:
-                if self[y].seq[x] is 'A':
-                    alleles.append('A')
-                    alleles.append('A')
-                elif self[y].seq[x] is 'C':
-                    alleles.append('C')
-                    alleles.append('C')
-                elif self[y].seq[x] is 'G':
-                    alleles.append('G')
-                    alleles.append('G')
-                elif self[y].seq[x] is 'T':
-                    alleles.append('T')
-                    alleles.append('T')
-                elif self[y].seq[x] is 'R':
-                    alleles.append('A')
-                    alleles.append('G')
-                elif self[y].seq[x] is 'Y':
-                    alleles.append('C')
-                    alleles.append('T')
-                elif self[y].seq[x] is 'S':
-                    alleles.append('G')
-                    alleles.append('C')
-                elif self[y].seq[x] is 'W':
-                    alleles.append('A')
-                    alleles.append('T')
-                elif self[y].seq[x] is 'K':
-                    alleles.append('G')
-                    alleles.append('T')
-                elif self[y].seq[x] is 'M':
-                    alleles.append('A')
-                    alleles.append('C')
-        return alleles
+    def get_allele_frequencies(self, x, pops=[]):
+        if isinstance(pops, list) == False:
+            print("ERROR: Populations are not given as a list (get_allele_frequencies):")
+            print(pops)
+            sys.exit(0)
+        else:
+            allele_frequencies = [0, 0, 0, 0]
+            for y in range(0,len(self)):
+                if pops == []:
+                    if self[y].seq[x] is 'A':
+                        allele_frequencies[0] += 1
+                    elif self[y].seq[x] is 'C':
+                        allele_frequencies[1] += 1
+                    elif self[y].seq[x] is 'G':
+                        allele_frequencies[2] += 1
+                    elif self[y].seq[x] is 'T':
+                        allele_frequencies[3] += 1
+                else:
+                    for pop in pops:
+                        if pop in self[y].id:
+                            if self[y].seq[x] is 'A':
+                                allele_frequencies[0] += 1
+                            elif self[y].seq[x] is 'C':
+                                allele_frequencies[1] += 1
+                            elif self[y].seq[x] is 'G':
+                                allele_frequencies[2] += 1
+                            elif self[y].seq[x] is 'T':
+                                allele_frequencies[3] += 1
+            return allele_frequencies
+
+    def get_is_biallelic_per_site(self, x, pops=[]):
+        allele_frequencies = [0, 0, 0, 0]
+        for pop in pops:
+            pop_allele_frequencies = self.get_allele_frequencies(x, [pop])
+            allele_frequencies[0] += pop_allele_frequencies[0]
+            allele_frequencies[1] += pop_allele_frequencies[1]
+            allele_frequencies[2] += pop_allele_frequencies[2]
+            allele_frequencies[3] += pop_allele_frequencies[3]
+        allele_frequency_zeros = 0
+        if allele_frequencies[0] == 0:
+            allele_frequency_zeros += 1
+        if allele_frequencies[1] == 0:
+            allele_frequency_zeros += 1
+        if allele_frequencies[2] == 0:
+            allele_frequency_zeros += 1
+        if allele_frequencies[3] == 0:
+            allele_frequency_zeros += 1
+        if allele_frequency_zeros == 2:
+            return True
+        else:
+            return False
+
+    def get_is_variable_per_site(self, x, pops=[]):
+        allele_frequencies = [0, 0, 0, 0]
+        for pop in pops:
+            pop_allele_frequencies = self.get_allele_frequencies(x, [pop])
+            allele_frequencies[0] += pop_allele_frequencies[0]
+            allele_frequencies[1] += pop_allele_frequencies[1]
+            allele_frequencies[2] += pop_allele_frequencies[2]
+            allele_frequencies[3] += pop_allele_frequencies[3]
+        allele_frequency_zeros = 0
+        if allele_frequencies[0] == 0:
+            allele_frequency_zeros += 1
+        if allele_frequencies[1] == 0:
+            allele_frequency_zeros += 1
+        if allele_frequencies[2] == 0:
+            allele_frequency_zeros += 1
+        if allele_frequencies[3] == 0:
+            allele_frequency_zeros += 1
+        if allele_frequency_zeros == 3:
+            return False
+        else:
+            return True
+
+    def get_pi_per_site(self, x, pops=[]):
+        # pi is the probability that two randomly chosen sequences from the
+        # sample have different alleles at a site x.
+        # Following Ruegg et al. (2014, Mol Ecol, A role for migration-linked genes and genomic
+        # islands in divergence of a songbird), only biallelic (or in this case monomorphic)
+        # SNPs are allowed.
+        if isinstance(pops, list) == False:
+            print("ERROR: Populations are not given as a list (get_pi_per_site):")
+            print(pops)
+            sys.exit(0)
+        else:
+            all_allele_frequencies = self.get_allele_frequencies(x, pops)
+            two_allele_frequencies = []
+            for all_allele_frequency in all_allele_frequencies:
+                if all_allele_frequency is not 0:
+                    two_allele_frequencies.append(all_allele_frequency)
+            if len(two_allele_frequencies) == 0:
+                print("ERROR: No allele found!")
+                sys.exit(0)
+            elif len(two_allele_frequencies) == 1:
+                return 0
+            elif len(two_allele_frequencies) == 2:
+                # Use r and a as in Ruegg et al. (2014).
+                r = two_allele_frequencies[0]
+                a = two_allele_frequencies[1]
+                numerator = r * a
+                denominator = scipy.special.binom((r+a),2)
+                pi = numerator/denominator
+                return pi
+            elif len(two_allele_frequencies) > 2:
+                print("ERROR: More than two alleles found!")
+                sys.exit(0)
+
+    def get_pi(self, pops=[]):
+        pi_per_site_values = []
+        l_k = self.get_alignment_length()
+        for x in range(self.get_alignment_length()):
+            pi_per_site = self.get_pi_per_site(x, pops)
+            if pi_per_site is not None:
+                pi_per_site_values.append(pi_per_site)
+        if l_k == 0:
+            return None
+        else:
+            return sum(pi_per_site_values)/l_k
+
+    def get_F_st_per_site(self, x, pops=[]):
+        # Following Ruegg et al. (2014, Mol Ecol, A role for migration-linked genes and genomic
+        # islands in divergence of a songbird) in using the equation of Hohenlohe et al. (2010)
+        # for per snp calculation of F_st.
+        if len(pops) != 2:
+            print("Exactly two populations must be specified to calculate pairwise F_st!")
+            sys.exit(0)
+        else:
+            if self.get_is_biallelic_per_site(x, pops):
+                pop0_allele_frequencies_sum = sum(self.get_allele_frequencies(x, [pops[0]]))
+                pop1_allele_frequencies_sum = sum(self.get_allele_frequencies(x, [pops[1]]))
+                binomial_coefficient0 = scipy.special.binom(pop0_allele_frequencies_sum,2)
+                binomial_coefficient1 = scipy.special.binom(pop1_allele_frequencies_sum,2)
+                pi_per_site0 = self.get_pi_per_site(x, [pops[0]])
+                pi_per_site1 = self.get_pi_per_site(x, [pops[1]])
+                pi_per_site01 = self.get_pi_per_site(x, pops)
+                numerator = pi_per_site0*binomial_coefficient0 + pi_per_site1*binomial_coefficient1
+                denominator = pi_per_site01 * (binomial_coefficient0+binomial_coefficient1)
+                if denominator == 0:
+                    print("ERROR: Attempt to divide by zero!")
+                    sys.exit(0)
+                f_st_per_site = 1 - (numerator / denominator)
+                return f_st_per_site
+            else:
+                return None
 
     def get_F_st(self, pops=[]):
         if len(pops) != 2:
             print("Exactly two populations must be specified to calculate pairwise F_st!")
             sys.exit(0)
         else:
-            pop0_seqs = []
-            pop1_seqs = []
-            for y in range(0,len(self)):
-                if pops[0] in self[y].id:
-                    pop0_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
-                elif pops[1] in self[y].id:
-                    pop1_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
-            if len(pop0_seqs) < 2:
-                return None
-            elif len(pop1_seqs) < 2:
+            f_st_per_site_values = []
+            for x in range(self.get_alignment_length()):
+                f_st_per_site = self.get_F_st_per_site(x, pops)
+                if f_st_per_site is not None:
+                    f_st_per_site_values.append(f_st_per_site)
+            if f_st_per_site_values == []:
                 return None
             else:
-                within_variations = []
-                for x in range(0,len(pop0_seqs)-1):
-                    for y in range(x+1,len(pop0_seqs)):
-                        within_variations.append(pop0_seqs[x].get_distance_to(pop0_seqs[y], False))
-                for x in range(0,len(pop1_seqs)-1):
-                    for y in range(x+1,len(pop1_seqs)):
-                        within_variations.append(pop1_seqs[x].get_distance_to(pop1_seqs[y], False))
-                between_variations = []
-                for x in range(0,len(pop0_seqs)-1):
-                    for y in range(0,len(pop1_seqs)):
-                        between_variations.append(pop0_seqs[x].get_distance_to(pop1_seqs[y], False))
-                mean_between_variation = sum(between_variations)/len(between_variations)
-                mean_within_variation = sum(within_variations)/len(within_variations)
-            if mean_between_variation == 0:
-                return None
-            else:
-                return (mean_between_variation-mean_within_variation)/mean_between_variation
+                return sum(f_st_per_site_values)/len(f_st_per_site_values)
+
+            # pop0_seqs = []
+            # pop1_seqs = []
+            # for y in range(0,len(self)):
+            #     if pops[0] in self[y].id:
+            #         pop0_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
+            #     elif pops[1] in self[y].id:
+            #         pop1_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
+            # if len(pop0_seqs) < 2:
+            #     return None
+            # elif len(pop1_seqs) < 2:
+            #     return None
+            # else:
+            #     within_variations = []
+            #     for x in range(0,len(pop0_seqs)-1):
+            #         for y in range(x+1,len(pop0_seqs)):
+            #             within_variations.append(pop0_seqs[x].get_distance_to(pop0_seqs[y], False))
+            #     for x in range(0,len(pop1_seqs)-1):
+            #         for y in range(x+1,len(pop1_seqs)):
+            #             within_variations.append(pop1_seqs[x].get_distance_to(pop1_seqs[y], False))
+            #     between_variations = []
+            #     for x in range(0,len(pop0_seqs)-1):
+            #         for y in range(0,len(pop1_seqs)):
+            #             between_variations.append(pop0_seqs[x].get_distance_to(pop1_seqs[y], False))
+            #     mean_between_variation = sum(between_variations)/len(between_variations)
+            #     mean_within_variation = sum(within_variations)/len(within_variations)
+            # if mean_between_variation == 0:
+            #     return None
+            # else:
+            #     return (mean_between_variation-mean_within_variation)/mean_between_variation
+
 
     def get_d_xy(self, pops=[]):
         if len(pops) != 2:
             print("Exactly two populations must be specified to calculate pairwise d_xy!")
             sys.exit(0)
         else:
-            pop0_seqs = []
-            pop1_seqs = []
-            for y in range(0,len(self)):
-                if pops[0] in self[y].id:
-                    pop0_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
-                elif pops[1] in self[y].id:
-                    pop1_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
-            if len(pop0_seqs) < 2:
-                return None
-            elif len(pop1_seqs) < 2:
-                return None
-            else:
-                between_variations = []
-                for x in range(0,len(pop0_seqs)-1):
-                    for y in range(0,len(pop1_seqs)):
-                        between_variations.append(pop0_seqs[x].get_distance_to(pop1_seqs[y], False))
-                d_xy = sum(between_variations)
-                return d_xy
+            l_k = self.get_alignment_length()
+            sum_of_quotients = 0
+            for x in range(self.get_alignment_length()):
+                if self.get_is_biallelic_per_site(x, pops):
+                    all_allele_frequencies0 = self.get_allele_frequencies(x, [pops[0]])
+                    all_allele_frequencies1 = self.get_allele_frequencies(x, [pops[1]])
+                    two_allele_frequencies0 = []
+                    two_allele_frequencies1 = []
+                    if all_allele_frequencies0[0] != 0 or all_allele_frequencies1[0] != 0:
+                        two_allele_frequencies0.append(all_allele_frequencies0[0])
+                        two_allele_frequencies1.append(all_allele_frequencies1[0])
+                    if all_allele_frequencies0[1] != 0 or all_allele_frequencies1[1] != 0:
+                        two_allele_frequencies0.append(all_allele_frequencies0[1])
+                        two_allele_frequencies1.append(all_allele_frequencies1[1])
+                    if all_allele_frequencies0[2] != 0 or all_allele_frequencies1[2] != 0:
+                        two_allele_frequencies0.append(all_allele_frequencies0[2])
+                        two_allele_frequencies1.append(all_allele_frequencies1[2])
+                    if all_allele_frequencies0[3] != 0 or all_allele_frequencies1[3] != 0:
+                        two_allele_frequencies0.append(all_allele_frequencies0[3])
+                        two_allele_frequencies1.append(all_allele_frequencies1[3])
+                    if len(two_allele_frequencies0) != 2:
+                        print("ERROR: Wrong number of allele frequencies!")
+                        print(all_allele_frequencies0)
+                        print(all_allele_frequencies1)
+                        sys.exit(0)
+                    r0 = two_allele_frequencies0[0]
+                    a0 = two_allele_frequencies0[1]
+                    r1 = two_allele_frequencies1[0]
+                    a1 = two_allele_frequencies1[1]
+                    numerator = r0*a1 + r1*a0
+                    denominator = (r0+a0) * (r1+a1)
+                    sum_of_quotients += numerator/denominator
+            d_xy = sum_of_quotients/l_k
+            return d_xy
 
-    def get_d_a(self, pops=[]):
+    def get_d_f(self, pops=[]):
         if len(pops) != 2:
-            print("Exactly two populations must be specified to calculate pairwise d_a!")
+            print("Exactly two populations must be specified to calculate pairwise d_xy!")
             sys.exit(0)
         else:
-            pop0_seqs = []
-            pop1_seqs = []
-            for y in range(0,len(self)):
-                if pops[0] in self[y].id:
-                    pop0_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
-                elif pops[1] in self[y].id:
-                    pop1_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
-            if len(pop0_seqs) < 2:
-                return None
-            elif len(pop1_seqs) < 2:
-                return None
-            else:
-                within_variations1 = []
-                for x in range(0,len(pop0_seqs)-1):
-                    for y in range(x+1,len(pop0_seqs)):
-                        within_variations1.append(pop0_seqs[x].get_distance_to(pop0_seqs[y], False))
-                within_variations2 = []
-                for x in range(0,len(pop1_seqs)-1):
-                    for y in range(x+1,len(pop1_seqs)):
-                        within_variations2.append(pop1_seqs[x].get_distance_to(pop1_seqs[y], False))
-                between_variations = []
-                for x in range(0,len(pop0_seqs)-1):
-                    for y in range(0,len(pop1_seqs)):
-                        between_variations.append(pop0_seqs[x].get_distance_to(pop1_seqs[y], False))
-                sum_within1 = sum(within_variations1)
-                sum_within2 = sum(within_variations2)
-                sum_between = sum(between_variations)
-                d_a = sum_between - (sum_within1 + sum_within2)/2
-            if d_a == 0:
-                return None
-            else:
-                return d_a
+            l_k = self.get_alignment_length()
+            number_of_fixed_snps = 0
+            for x in range(self.get_alignment_length()):
+                if self.get_is_biallelic_per_site(x, pops):
+                    pop0_variable = self.get_is_variable_per_site(x, pops[0])
+                    pop1_variable = self.get_is_variable_per_site(x, pops[1])
+                    if pop0_variable == False and pop1_variable == False:
+                        number_of_fixed_snps += 1
+            d_f = number_of_fixed_snps/l_k
+            return d_f
+
+            # pop0_seqs = []
+            # pop1_seqs = []
+            # for y in range(0,len(self)):
+            #     if pops[0] in self[y].id:
+            #         pop0_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
+            #     elif pops[1] in self[y].id:
+            #         pop1_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
+            # if len(pop0_seqs) < 2:
+            #     return None
+            # elif len(pop1_seqs) < 2:
+            #     return None
+            # else:
+            #     between_variations = []
+            #     for x in range(0,len(pop0_seqs)-1):
+            #         for y in range(0,len(pop1_seqs)):
+            #             between_variations.append(pop0_seqs[x].get_distance_to(pop1_seqs[y], False))
+            #     d_xy = sum(between_variations)
+            #     return d_xy
+
+    # def get_d_a(self, pops=[]):
+    #     if len(pops) != 2:
+    #         print("Exactly two populations must be specified to calculate pairwise d_a!")
+    #         sys.exit(0)
+    #     else:
+    #         pop0_seqs = []
+    #         pop1_seqs = []
+    #         for y in range(0,len(self)):
+    #             if pops[0] in self[y].id:
+    #                 pop0_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
+    #             elif pops[1] in self[y].id:
+    #                 pop1_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
+    #         if len(pop0_seqs) < 2:
+    #             return None
+    #         elif len(pop1_seqs) < 2:
+    #             return None
+    #         else:
+    #             within_variations1 = []
+    #             for x in range(0,len(pop0_seqs)-1):
+    #                 for y in range(x+1,len(pop0_seqs)):
+    #                     within_variations1.append(pop0_seqs[x].get_distance_to(pop0_seqs[y], False))
+    #             within_variations2 = []
+    #             for x in range(0,len(pop1_seqs)-1):
+    #                 for y in range(x+1,len(pop1_seqs)):
+    #                     within_variations2.append(pop1_seqs[x].get_distance_to(pop1_seqs[y], False))
+    #             between_variations = []
+    #             for x in range(0,len(pop0_seqs)-1):
+    #                 for y in range(0,len(pop1_seqs)):
+    #                     between_variations.append(pop0_seqs[x].get_distance_to(pop1_seqs[y], False))
+    #             sum_within1 = sum(within_variations1)
+    #             sum_within2 = sum(within_variations2)
+    #             sum_between = sum(between_variations)
+    #             d_a = sum_between - (sum_within1 + sum_within2)/2
+    #         if d_a == 0:
+    #             return None
+    #         else:
+    #             return d_a
 
 
 # Parse the command line arguments.
@@ -2522,7 +2704,8 @@ html_string += '              <tr>\n'
 html_string += '                <td width="168" style="font-weight:bold">Population</td>\n'
 html_string += '                <td width="168" style="font-weight:bold">Variable sites</td>\n'
 html_string += '                <td width="168" style="font-weight:bold">Invariable sites</td>\n'
-html_string += '                <td width="336" style="font-weight:bold">Proportion variable</td>\n'
+html_string += '                <td width="168" style="font-weight:bold">Proportion variable</td>\n'
+html_string += '                <td width="168" style="font-weight:bold">&pi;</td>\n'
 html_string += '              </tr>\n'
 html_string += '              <tr>\n'
 html_string += '                <td width="168" style="font-weight:bold">All</td>\n'
@@ -2531,16 +2714,20 @@ html_string += '                <td width="168">' + str(align.get_number_of_vari
 html_string += '                <!-- Total variable: string end -->\n'
 html_string += '                <td width="168">' + str(align.get_number_of_invariable_sites()) + '</td>\n'
 html_string += '                <!-- Proportion variable: string start -->\n'
-html_string += '                <td width="336">' + "{0:.4f}".format(align.get_proportion_of_variable_sites()) + '</td>\n'
+html_string += '                <td width="168">' + "{0:.4f}".format(align.get_proportion_of_variable_sites()) + '</td>\n'
 html_string += '                <!-- Proportion variable: string end -->\n'
+html_string += '                <!-- Pi: string start -->\n'
+html_string += '                <td width="168">' + "{0:.4f}".format(align.get_pi()) + '</td>\n'
+html_string += '                <!-- Pi: string end -->\n'
 html_string += '              </tr>\n'
 if pops != None:
     for pop in pops:
         html_string += '              <tr>\n'
         html_string += '                <td width="168" style="font-weight:bold">' + pop + '</td>\n'
-        html_string += '                <td width="168">' + str(align.get_number_of_variable_sites(pop)) + '</td>\n'
-        html_string += '                <td width="168">' + str(align.get_number_of_invariable_sites(pop)) + '</td>\n'
-        html_string += '                <td width="336">' + "{0:.4f}".format(align.get_proportion_of_variable_sites(pop)) + '</td>\n'
+        html_string += '                <td width="168">' + str(align.get_number_of_variable_sites([pop])) + '</td>\n'
+        html_string += '                <td width="168">' + str(align.get_number_of_invariable_sites([pop])) + '</td>\n'
+        html_string += '                <td width="168">' + "{0:.4f}".format(align.get_proportion_of_variable_sites([pop])) + '</td>\n'
+        html_string += '                <td width="168">' + "{0:.4f}".format(align.get_pi([pop])) + '</td>\n'
         html_string += '              </tr>\n'
 html_string += '            </table>\n'
 html_string += '          </td>\n'
@@ -2549,7 +2736,7 @@ html_string += '        </tr>\n'
 # The between population differentiation section.
 if pops != None and len(pops) > 1:
     html_string += '        <tr class="smallSpaceUnder">\n'
-    html_string += '          <td style="font-size:30px; font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12796/abstract">Between-population differentiation</a></td>\n'
+    html_string += '          <td style="font-size:30px; font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12842/abstract">Between-population differentiation</a></td>\n'
     html_string += '        </tr>\n'
     html_string += '        <tr class="largeSpaceUnder">\n'
     html_string += '          <td style="font-family:helvetica; font-size:12px">\n'
@@ -2569,7 +2756,7 @@ if pops != None and len(pops) > 1:
             f_st = align.get_F_st([pops[x], pops[y]])
             if x == 0 and y == 1:
                 html_string += '                <!-- First f_st: string start -->\n'
-            if f_st == None:
+            if f_st is None:
                 html_string += '                <td>NA</td>\n'
             else:
                 html_string += '                <td width="168">' + "{0:.4f}".format(f_st) + '</td>\n'
@@ -2578,21 +2765,21 @@ if pops != None and len(pops) > 1:
             d_xy = align.get_d_xy([pops[x], pops[y]])
             if x == 0 and y == 1:
                 html_string += '                <!-- First d_xy: string start -->\n'
-            if d_xy == None:
+            if d_xy is None:
                 html_string += '                <td width="168">NA</td>\n'
             else:
-                html_string += '                <td width="168">' + str(d_xy) + '</td>\n'
+                html_string += '                <td width="168">' + "{0:.4f}".format(d_xy) + '</td>\n'
             if x == 0 and y == 1:
                 html_string += '                <!-- First d_xy: string end -->\n'
-            d_a = align.get_d_a([pops[x], pops[y]])
+            d_f = align.get_d_f([pops[x], pops[y]])
             if x == 0 and y == 1:
-                html_string += '                <!-- First d_a: string start -->\n'
-            if d_a == None:
+                html_string += '                <!-- First d_f: string start -->\n'
+            if d_f is None:
                 html_string += '                <td width="168">NA</td>\n'
             else:
-                html_string += '                <td width="168">' + str(d_a) + '</td>\n'
+                html_string += '                <td width="168">' + "{0:.4f}".format(d_f) + '</td>\n'
             if x == 0 and y == 1:
-                html_string += '                <!-- First d_a: string end -->\n'
+                html_string += '                <!-- First d_f: string end -->\n'
             html_string += '              </tr>\n'
     html_string += '            </table>\n'
     html_string += '          </td>\n'
