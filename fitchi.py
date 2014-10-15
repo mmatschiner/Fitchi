@@ -1,0 +1,2679 @@
+#!/usr/local/bin/python3
+
+# Michael Matschiner, 2014-10-14
+# michaelmatschiner@mac.com
+
+# Import libraries and make sure we're on python 3.
+import sys
+if sys.version_info[0] < 3:
+    print('Python 3 is needed to run this script!')
+    sys.exit(0)
+import argparse
+import textwrap
+import random
+import tempfile
+import os
+import re
+import networkx as nx
+import math
+import scipy
+from scipy import special
+from subprocess import call
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+from Bio.Align import MultipleSeqAlignment
+from Bio.Alphabet import generic_dna
+from Bio import AlignIO, Nexus, Phylo
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+from Bio.Align import MultipleSeqAlignment
+from Bio.Alphabet import generic_dna
+
+# The Tree class.
+class Tree(object):
+
+    def __init__(self, newick_string):
+        self.newick_string = newick_string
+        self.nodes = []
+        self.edges = []
+        self.max_dist_to_root = 0
+        self.max_number_of_edges = 0
+        self.is_positioned = False
+        self.pops = []
+
+    def get_newick_string(self):
+        return self.newick_string
+
+    def parse_newick_string(self, pops):
+        if pops == None:
+            self.pops = []
+        else:
+            self.pops = pops
+        number_of_internal_nodes = 0
+        number_of_edges = 0
+
+        # Parse the bifurcating part of the tree.
+        pattern = re.compile("\(([a-zA-Z0-9_\.]+?):([\d\.Ee-]+?)\,([a-zA-Z0-9_\.]+?):([\d\.Ee-]+?)\)")
+        hit = "placeholder"
+        while hit != None:
+            hit = pattern.search(self.newick_string)
+            if hit != None:
+                number_of_internal_nodes += 1
+                number_of_edges += 2
+                internal_node_id = "internalNode" + str(number_of_internal_nodes) + "X"
+                edge1 = Edge("edge" + str(number_of_edges-1) + "X")
+                self.increase_max_number_of_edges()
+                edge1.set_node_ids([internal_node_id, hit.group(1)])
+                edge1.set_length(float(hit.group(2)))
+                node1 = Node(hit.group(1), False, self.pops)
+                node1.set_parent_id(internal_node_id)
+                if hit.group(1)[:12] == 'internalNode':
+                    node1.set_size(0)
+                else:
+                    node1.set_size(1)
+                    node1.add_record_id(hit.group(1))
+                edge2 = Edge("edge" + str(number_of_edges) + "X")
+                self.increase_max_number_of_edges()
+                edge2.set_node_ids([internal_node_id, hit.group(3)])
+                edge2.set_length(float(hit.group(4)))
+                node2 = Node(hit.group(3), False, self.pops)
+                node2.set_parent_id(internal_node_id)
+                if hit.group(3)[:12] == 'internalNode':
+                    node2.set_size(0)
+                else:
+                    node2.set_size(1)
+                    node2.add_record_id(hit.group(3))
+                self.edges.append(edge1)
+                self.edges.append(edge2)
+                self.nodes.append(node1)
+                self.nodes.append(node2)
+                self.newick_string = self.newick_string.replace(hit.group(0), internal_node_id)
+
+        # Parse the remaining string with three branches (since the tree is unrooted).
+        pattern_unrooted = re.compile("\(([a-zA-Z0-9_\.]+?):([\d\.Ee-]+?),([a-zA-Z0-9_\.]+?):([\d\.Ee-]+?),([a-zA-Z0-9_\.]+?):([\d\.Ee-]+?)\)")
+        hit_unrooted = pattern_unrooted.search(self.newick_string)
+        pattern_rooted = re.compile("internalNode\d+X")
+        hit_rooted = pattern_rooted.search(self.newick_string)
+        if hit_unrooted != None:
+            number_of_internal_nodes += 1
+            number_of_edges += 3
+            root_node_id = "internalNode" + str(number_of_internal_nodes) + "X"
+            edge1 = Edge("edge" + str(number_of_edges-2) + "X")
+            self.increase_max_number_of_edges()
+            edge1.set_node_ids([root_node_id, hit_unrooted.group(1)])
+            edge1.set_length(float(hit_unrooted.group(2)))
+            edge2 = Edge("edge" + str(number_of_edges-1) + "X")
+            self.increase_max_number_of_edges()
+            edge2.set_node_ids([root_node_id, hit_unrooted.group(3)])
+            edge2.set_length(float(hit_unrooted.group(4)))
+            edge3 = Edge("edge" + str(number_of_edges) + "X")
+            self.increase_max_number_of_edges()
+            edge3.set_node_ids([root_node_id, hit_unrooted.group(5)])
+            edge3.set_length(float(hit_unrooted.group(6)))
+            node1 = Node(hit_unrooted.group(1), False, self.pops)
+            node1.set_parent_id(root_node_id)
+            node2 = Node(hit_unrooted.group(3), False, self.pops)
+            node2.set_parent_id(root_node_id)
+            node3 = Node(hit_unrooted.group(5), False, self.pops)
+            node3.set_parent_id(root_node_id)
+            node4 = Node(root_node_id, True, self.pops)
+            node4.set_parent_id('None')
+            if hit_unrooted.group(1)[:12] == 'internalNode':
+                node1.set_size(0)
+            else:
+                node1.set_size(1)
+            if hit_unrooted.group(3)[:12] == 'internalNode':
+                node2.set_size(0)
+            else:
+                node2.set_size(1)
+            if hit_unrooted.group(5)[:12] == 'internalNode':
+                node3.set_size(0)
+            else:
+                node3.set_size(1)
+            node4.set_size(0)
+            self.edges.append(edge1)
+            self.edges.append(edge2)
+            self.edges.append(edge3)
+            self.nodes.append(node1)
+            self.nodes.append(node2)
+            self.nodes.append(node3)
+            self.nodes.append(node4)
+        elif hit_rooted != None:
+            node = Node(hit_rooted.group(0), True, self.pops)
+            node.set_parent_id('None')
+            node.set_size(0)
+            self.nodes.append(node)
+        else:
+            print(self.newick_string)
+            print('ERROR: The newick tree string could not be parsed!')
+            sys.exit(0)
+
+        # Add info about children to each node.
+        count = 0
+        for node in self.nodes:
+            for parent in self.nodes:
+                if node.get_parent_id() == parent.get_id():
+                    parent.add_child_id(node.get_id())
+                    break
+
+        # Calculate the distances to the root for each node.
+        self.set_node_distances_to_root()
+
+    def set_node_distances_to_root(self):
+        # Reset max_dist_to_root.
+        self.max_dist_to_root = 0
+        # Add distance to root for each node.
+        for node in self.nodes:
+            dist = 0
+            if node.get_is_root() == False:
+                root_found = False
+                tmp_node = node
+                while root_found == False:
+                    dist += 1
+                    # Find the parental node.
+                    for parent in self.nodes:
+                        if tmp_node.get_parent_id() == parent.get_id():
+                            tmp_node = parent
+                            break
+                    if tmp_node.get_is_root():
+                        root_found = True
+            node.set_distance_to_root(dist)
+            if dist > self.max_dist_to_root:
+                self.max_dist_to_root = dist
+
+    def get_nodes(self):
+        return self.nodes
+
+    def get_edges(self):
+        return self.edges
+
+    def get_number_of_nodes(self):
+        return len(self.nodes)
+
+    def get_number_of_edges(self):
+        return len(self.edges)
+
+    def get_max_number_of_edges(self):
+        return self.max_number_of_edges
+
+    def increase_max_number_of_edges(self):
+        self.max_number_of_edges += 1
+
+    def get_max_dist_to_root(self):
+        return self.max_dist_to_root
+
+    def reconstruct_ancestral_sequences(self):
+        # This uses the Fitch algorithm to assign sequences to internal nodes.
+
+        # Find the sequence length.
+        seq_length = 0
+        for node in self.nodes:
+            sequences = node.get_sequences()
+            if sequences != []:
+                sequence = sequences[0]
+                seq_length = len(sequence)
+        if seq_length == 0:
+            print("WARNING: No sequence was found for any of the nodes!")
+
+        # Prepare empty state sets and states of all nodes.
+        for node in self.nodes:
+            node.prepare_state_sets(seq_length)
+            node.prepare_states(seq_length)
+
+        # Compute the state sets of all nodes, sorted by their distance to the root (bottom up).
+        invest_dist = self.max_dist_to_root
+        while invest_dist >= 0:
+            for node in self.nodes:
+                if node.get_distance_to_root() == invest_dist:
+                    node_id = node.get_id()
+                    # If the node is an internal node, find its children and copy their state sets.
+                    if node_id[:12] == 'internalNode':
+                        children = []
+                        for child in self.nodes:
+                            if child.get_parent_id() == node_id:
+                                children.append(child)
+                        for x in range(seq_length):
+                            children_state_sets = []
+                            for child in children:
+                                children_state_sets.append(child.get_state_set(x))
+                            if len(children_state_sets) == 2:
+                                intersection = list(set.intersection(set(children_state_sets[0]),set(children_state_sets[1])))
+                            elif len(children_state_sets) == 3:
+                                intersection = list(set.intersection(set(children_state_sets[0]),set(children_state_sets[1]),set(children_state_sets[2])))
+                            else:
+                                print('WARNING: An unexpected number of child state sets was encountered.')
+                            if len(intersection) == 0:
+                                # Flatten children state sets
+                                flat_children_state_sets = []
+                                for children_state_set in children_state_sets:
+                                    for children_state in children_state_set:
+                                        flat_children_state_sets.append(children_state)
+                                state_set = list(set(flat_children_state_sets))
+                            else:
+                                state_set = intersection
+                            node.set_state_set(x, state_set)
+
+                    # If the node is terminal, get its state sets directly from its sequence.
+                    else:
+                        for x in range(seq_length):
+                            if node.get_sequences()[0][x].upper() == 'A':
+                                state_set = ['A']
+                            elif node.get_sequences()[0][x].upper() == 'C':
+                                state_set = ['C']
+                            elif node.get_sequences()[0][x].upper() == 'G':
+                                state_set = ['G']
+                            elif node.get_sequences()[0][x].upper() == 'T':
+                                state_set = ['T']
+                            elif node.get_sequences()[0][x].upper() == 'R':
+                                state_set = ['A','G']
+                            elif node.get_sequences()[0][x].upper() == 'Y':
+                                state_set = ['C','T']
+                            elif node.get_sequences()[0][x].upper() == 'S':
+                                state_set = ['C','G']
+                            elif node.get_sequences()[0][x].upper() == 'W':
+                                state_set = ['A','T']
+                            elif node.get_sequences()[0][x].upper() == 'K':
+                                state_set = ['G','T']
+                            elif node.get_sequences()[0][x].upper() == 'M':
+                                state_set = ['A','C']
+                            elif node.get_sequences()[0][x].upper() == 'B':
+                                state_set = ['C','G','T']
+                            elif node.get_sequences()[0][x].upper() == 'D':
+                                state_set = ['A','G','T']
+                            elif node.get_sequences()[0][x].upper() == 'H':
+                                state_set = ['A','C','T']
+                            elif node.get_sequences()[0][x].upper() == 'V':
+                                state_set = ['A','C','G']
+                            elif node.get_sequences()[0][x].upper() == 'N':
+                                state_set = ['A','C','G','T']
+                            elif node.get_sequences()[0][x] == '?':
+                                state_set = ['A','C','G','T']
+                            elif node.get_sequences()[0][x] == '-':
+                                state_set = ['A','C','G','T']
+                            else:
+                                print(node.get_sequences()[0][x])
+                            node.set_state_set(x, state_set)
+            invest_dist -= 1
+
+        # Find one of the most parsimonious solutions (at random) to reconstruct
+        # ancestral sequences (top down).
+        # Deal with the root separately.
+        for node in self.nodes:
+            if node.get_is_root() == True:
+                for x in range(seq_length):
+                    state_set = node.get_state_set(x)
+                    state = random.choice(state_set)
+                    node.set_state(x, state)
+                break
+        # Deal with all other nodes (including terminal ones for consistency).
+        invest_dist = 1
+        while invest_dist <= self.max_dist_to_root:
+            for node in self.nodes:
+                if node.get_distance_to_root() == invest_dist:
+                    for parent in self.nodes:
+                        if node.get_parent_id() == parent.get_id():
+                            for x in range(seq_length):
+                                if parent.get_state(x) in node.get_state_set(x):
+                                    node.set_state(x, parent.get_state(x))
+                                else:
+                                    node.set_state(x, random.choice(node.get_state_set(x)))
+                            break
+            invest_dist += 1
+                    
+        # Convert state sets to sequences for all nodes.
+        for node in self.nodes:
+            node.convert_states_to_sequence()
+
+    def calculate_fitch_distances(self, transversions_only):
+        for edge in self.edges:
+            seqs = []
+            for node in self.nodes:
+                if node.get_id() in edge.get_node_ids():
+                    seqs.append(node.get_sequences()[0])                    
+            seq1 = XSeq(seqs[0])
+            seq2 = XSeq(seqs[1])
+            fitch_dist = seq1.get_distance_to(seq2, transversions_only)
+            edge.set_fitch_distance(fitch_dist)
+
+    def reduce(self, minimum_edge_length, minimum_node_size):
+        # Unless an edge is removed already, check whether it should be removed
+        # (this is the case if its Fitch distance is 0).
+        for edge in self.edges:
+            if edge.get_is_removed() == False:
+                if edge.get_fitch_distance() < minimum_edge_length:
+                    # Find the two nodes of that edge.
+                    edge_nodes = []
+                    for node in self.nodes:
+                        if node.get_is_removed() == False:
+                            if node.get_id() in edge.get_node_ids():
+                                edge_nodes.append(node)
+                    # Find out which of the two nodes of this edge is the parent
+                    # of the other.
+                    if edge_nodes[0].get_id() == edge_nodes[1].get_parent_id():
+                        # edge_nodes[0] is always the parent of edge_nodes[1]
+                        node_to_be_removed = edge_nodes[1]
+                        node_to_be_kept = edge_nodes[0]
+                    else:
+                        # edge_nodes[1] is the parent of edge_nodes[0]
+                        node_to_be_removed = edge_nodes[0]
+                        node_to_be_kept = edge_nodes[1]
+                    # Transfer properties from the node to be removed to the one to
+                    # be kept.
+                    node_to_be_kept.increase_size(node_to_be_removed.get_size())
+                    for child_id in node_to_be_removed.get_child_ids():
+                        node_to_be_kept.add_child_id(child_id)
+                    for record_id in node_to_be_removed.get_record_ids():
+                        node_to_be_kept.add_record_id(record_id)
+                    for sequence in node_to_be_removed.get_sequences():
+                        node_to_be_kept.add_sequence(sequence)
+                    node_to_be_kept.remove_child_id(node_to_be_removed.get_id())
+                    for pop in node_to_be_removed.get_pops():
+                        node_to_be_kept.add_pop(pop)
+                    # Find the children of node_to_be_removed and correct their parent_id.
+                    for child in self.nodes:
+                        if child.get_parent_id() == node_to_be_removed.get_id():
+                            child.set_parent_id(node_to_be_removed.get_parent_id())
+                    # Remove node_to_be_removed.
+                    node_to_be_removed.set_is_removed(True)
+                    # Find all edges that connected to the node, and replace their node id.
+                    for downstream_edge in self.edges:
+                        if downstream_edge != edge:
+                            downstream_edge_node_ids = downstream_edge.get_node_ids()
+                            if node_to_be_removed.get_id() in downstream_edge_node_ids:
+                                downstream_edge_node_ids[0] = node_to_be_kept.get_id()
+                                downstream_edge.set_node_ids(downstream_edge_node_ids)
+                    # Remove this edge.
+                    edge.set_is_removed(True)
+
+        # Filter out the removed edges and nodes.
+        new_edges = []
+        for edge in self.edges:
+            if edge.get_is_removed() == False:
+                new_edges.append(edge)
+        self.edges = new_edges
+        new_nodes = []
+        for node in self.nodes:
+            if node.get_is_removed() == False:
+                new_nodes.append(node)
+        self.nodes = new_nodes
+
+        # Recalculate the distances to the root.
+        self.set_node_distances_to_root()
+
+        # As a second reduction step, remove nodes (and their parental edges) if they
+        # have no children, and a node size below the minimum node size. This is done
+        # in a bottom-up way.
+        if minimum_node_size > 1:
+            invest_dist = self.max_dist_to_root
+            while invest_dist >= 0:
+                for node in self.nodes:
+                    if node.get_distance_to_root() == invest_dist:
+                        if node.get_child_ids() == [] and node.get_size() < minimum_node_size:
+                            node.set_is_removed(True)
+                            # Find the edge that connects to this node, and remove it.
+                            for upstream_edge in self.edges:
+                                upstream_edge_node_ids = upstream_edge.get_node_ids()
+                                if node.get_id() in upstream_edge_node_ids:
+                                    upstream_edge.set_is_removed(True)
+                            # Find the parental node, and remove this child of it.
+                            for parent in self.nodes:
+                                if parent.get_id() == node.get_parent_id():
+                                    parent.remove_child_id(node.get_id())
+                invest_dist -= 1
+
+            # Filter out the removed edges and nodes.
+            new_edges = []
+            for edge in self.edges:
+                if edge.get_is_removed() == False:
+                    new_edges.append(edge)
+            self.edges = new_edges
+            new_nodes = []
+            for node in self.nodes:
+                if node.get_is_removed() == False:
+                    new_nodes.append(node)
+            self.nodes = new_nodes
+
+            # Recalculate the distances to the root.
+            self.set_node_distances_to_root()
+
+            # As a third reduction step, remove internal nodes with a size
+            # below the minimum node size and exactly one downstream and one
+            # upstream edge.
+            change = True
+            while change == True:
+                change = False
+                for node in self.nodes:
+                    # All nodes except the root are considered.
+                    if node.get_is_root() == False:
+                        if node.get_size() < minimum_node_size and len(node.get_child_ids()) == 1:
+                            node_id = node.get_id()
+                            child_id = node.get_child_ids()[0]
+                            parent_id = node.get_parent_id()
+                            node.set_is_removed(True)
+                            # Find the connecting edges.
+                            for edge in self.edges:
+                                if edge.get_is_removed() == False:
+                                    edge_node_ids = edge.get_node_ids()
+                                    if node_id in edge_node_ids:
+                                        if child_id in edge_node_ids:
+                                            downstream_edge_fitch_distance = edge.get_fitch_distance()
+                                            downstream_edge_length = edge.get_length()
+                                            edge.set_is_removed(True)
+                                        elif parent_id in edge_node_ids:
+                                            upstream_edge_fitch_distance = edge.get_fitch_distance()
+                                            upstream_edge_length = edge.get_length()
+                                            edge.set_is_removed(True)
+                            new_edge = Edge("edge" + str(self.get_max_number_of_edges()) + "X")
+                            self.increase_max_number_of_edges()
+                            new_edge.set_node_ids([parent_id,child_id])
+                            new_edge_length = downstream_edge_length
+                            new_edge_length += upstream_edge_length
+                            new_edge.set_length(new_edge_length)
+                            new_edge_fitch_distance = downstream_edge_fitch_distance 
+                            new_edge_fitch_distance += upstream_edge_fitch_distance
+                            new_edge.set_fitch_distance(new_edge_fitch_distance)
+                            self.edges.append(new_edge)
+                            # Find the parent and change its child ids.
+                            for parent in self.nodes:
+                                if parent.get_id() == parent_id:
+                                    parent.remove_child_id(node_id)
+                                    parent.add_child_id(child_id)
+                                    break
+                            # Find the child and replace its parent id.
+                            for child in self.nodes:
+                                if child.get_id() == child_id:
+                                    child.set_parent_id(parent_id)
+                            change = True
+                            break
+
+                if change == True:
+                    # Filter out the removed edges and nodes.
+                    new_edges = []
+                    for edge in self.edges:
+                        if edge.get_is_removed() == False:
+                            new_edges.append(edge)
+                    self.edges = new_edges
+                    new_nodes = []
+                    for node in self.nodes:
+                        if node.get_is_removed() == False:
+                            new_nodes.append(node)
+                    self.nodes = new_nodes
+
+            # In case the root node is below the minimum node size,
+            # deal with it separately, as it was excluded above.
+            change = False
+            for old_root in self.nodes:
+                if old_root.get_is_root() == True:
+                    number_of_root_children = len(old_root.get_child_ids())
+                    if old_root.get_size() < minimum_node_size and number_of_root_children == 2:
+                        # Make one of the root children the new root, and make the other one
+                        # the child of the new root.
+                        old_root_child_ids = old_root.get_child_ids()
+                        for old_root_child in self.nodes:
+                            if old_root_child.get_id() == old_root_child_ids[0]:
+                                new_root = old_root_child
+                            elif old_root_child.get_id() == old_root_child_ids[1]:
+                                new_root_child = old_root_child
+                        old_root.set_is_root(False)
+                        old_root.set_is_removed(True)
+                        new_root.set_is_root(True)
+                        new_root.set_parent_id('None')
+                        new_root.add_child_id(new_root_child.get_id())
+                        new_root_child.set_parent_id(new_root.get_id())
+                        # Combine the two edges that connected to the old root to a new one.
+                        new_root_edge_length = 0
+                        new_root_edge_fitch_distance = 0
+                        for old_root_edge in self.edges:
+                            old_root_edge_node_ids = old_root_edge.get_node_ids()
+                            if old_root.get_id() in old_root_edge_node_ids:
+                                new_root_edge_length += old_root_edge.get_length()
+                                new_root_edge_fitch_distance += old_root_edge.get_fitch_distance()
+                                old_root_edge.set_is_removed(True)
+                        new_root_edge = Edge("edge" + str(self.get_max_number_of_edges()) + "X")
+                        self.increase_max_number_of_edges()
+                        new_root_edge.set_node_ids([new_root.get_id(),new_root_child.get_id()])
+                        new_root_edge.set_length(new_root_edge_length)
+                        new_root_edge.set_fitch_distance(new_root_edge_fitch_distance)
+                        self.edges.append(new_root_edge)
+                        change = True
+                    break
+
+            if change == True:
+                # Filter out the removed edges and nodes.
+                new_edges = []
+                for edge in self.edges:
+                    if edge.get_is_removed() == False:
+                        new_edges.append(edge)
+                self.edges = new_edges
+                new_nodes = []
+                for node in self.nodes:
+                    if node.get_is_removed() == False:
+                        new_nodes.append(node)
+                self.nodes = new_nodes
+
+            # Consider the case that the root is smaller than the minimum size,
+            # but has only a single child.
+            change = False
+            for old_root in self.nodes:
+                if old_root.get_is_root() == True:
+                    number_of_root_children = len(old_root.get_child_ids())
+                    if old_root.get_size() < minimum_node_size and number_of_root_children == 1:
+                        # Make the only root child the new root, remove the root
+                        # and the single root edge.
+                        for new_root in self.nodes:
+                            if new_root.get_id() == old_root.get_child_ids()[0]:
+                                old_root.set_is_root(False)
+                                old_root.set_is_removed(True)
+                                new_root.set_is_root(True)
+                                new_root.set_parent_id('None')
+                        for old_root_edge in self.edges:
+                            old_root_edge_node_ids = old_root_edge.get_node_ids()
+                            if old_root.get_id() in old_root_edge_node_ids:
+                                old_root_edge.set_is_removed(True)
+                        change = True
+                    break
+
+            if change == True:
+                # Filter out the removed edges and nodes.
+                new_edges = []
+                for edge in self.edges:
+                    if edge.get_is_removed() == False:
+                        new_edges.append(edge)
+                self.edges = new_edges
+                new_nodes = []
+                for node in self.nodes:
+                    if node.get_is_removed() == False:
+                        new_nodes.append(node)
+                self.nodes = new_nodes
+
+        # Recalculate the distances to the root.
+        self.set_node_distances_to_root()
+
+        # Set the population sizes per population, for each node.
+        for node in self.nodes:
+            node.set_per_pop_sizes(self.pops)
+
+    def position(self, algorithm, minimum_node_size):
+        G = nx.Graph()
+        for node in self.nodes:
+            G.add_node(node.get_id())
+        for edge in self.edges:
+            node_ids = edge.get_node_ids()
+            G.add_edge(node_ids[0], node_ids[1])
+        pos = nx.graphviz_layout(G, prog=algorithm, root=None)
+
+        for edge in self.edges:
+            edge_node_ids = edge.get_node_ids()
+            for node_id, coordinates in pos.items():
+                if node_id == edge_node_ids[0]:
+                    x1 = coordinates[0]
+                    y1 = coordinates[1]
+                elif node_id == edge_node_ids[1]:
+                    x2 = coordinates[0]
+                    y2 = coordinates[1]
+            uncorrected_delta_x = x2 - x1
+            uncorrected_delta_y = y2 - y1
+            inverse_scale_factor = math.sqrt(uncorrected_delta_x**2 + uncorrected_delta_y**2)
+            unit_delta_x = uncorrected_delta_x/inverse_scale_factor
+            unit_delta_y = uncorrected_delta_y/inverse_scale_factor
+            edge.set_unit_delta_x(unit_delta_x)
+            edge.set_unit_delta_y(unit_delta_y)
+
+        # Set the position of the root node to 0,0.
+        root_found = False
+        for node in self.nodes:
+            if node.get_is_root() == True:
+                root_found = True
+                node.set_x(0.0)
+                node.set_y(0.0)
+                break
+        if root_found == False and len(self.nodes) > 0:
+            print('WARNING: No root was found!')
+
+        # Deal with all other nodes in a top-down sequence.
+        invest_dist = 1
+        while invest_dist <= self.max_dist_to_root:
+            for node in self.nodes:
+                if node.get_distance_to_root() == invest_dist:
+                    node_id = node.get_id()
+                    # Get the radius of this node.
+                    node_radius = node.get_radius(minimum_node_size)
+                    # Get the radius of the parent of this node:
+                    parent_found = False
+                    for parent in self.nodes:
+                        if parent.get_id() == node.get_parent_id():
+                            parent_found = True
+                            parent_id = parent.get_id()
+                            parent_radius = parent.get_radius(minimum_node_size)
+                            parent_x = parent.get_x()
+                            parent_y = parent.get_y()
+                            break
+                    if parent_found == False:
+                        print('WARNING: Parent not found!')
+                    # Get the edge that connects this node with its parent.
+                    connecting_edge_found = False
+                    for edge in self.edges:
+                        edge_node_ids = edge.get_node_ids()
+                        if edge_node_ids[0] == parent_id and edge_node_ids[1] == node_id:
+                            connecting_edge_found = True
+                            connecting_edge = edge
+                            break
+                    if connecting_edge_found == False:
+                        print('WARNING: An edge was not found!')
+                    connecting_edge_length = connecting_edge.get_fitch_distance()
+                    total_edge_length = node_radius + parent_radius + connecting_edge_length
+                    total_delta_x = total_edge_length * connecting_edge.get_unit_delta_x()
+                    total_delta_y = total_edge_length * connecting_edge.get_unit_delta_y()
+                    node.set_x(parent_x + total_delta_x)
+                    node.set_y(parent_y + total_delta_y)
+            invest_dist += 1
+        self.is_positioned = True
+
+    def to_svg(self, dim_x, dim_y, margin, minimum_node_size, colors, rest_color):
+        if len(self.nodes) > 0:
+            # Determine the two nodes with the greatest distance to each other.
+            max_node_distance = 0
+            index = 0
+            if len(self.nodes) > 1:
+                for node in self.nodes:
+                    for other_node in self.nodes[(index+1):len(self.nodes)]:
+                        delta_x = (node.get_x()-other_node.get_x())**2
+                        delta_y = (node.get_y()-other_node.get_y())**2
+                        node_distance = math.sqrt(delta_x + delta_y)
+                        if node_distance > max_node_distance:
+                            max_node_distance = node_distance
+                            max_dist_node1 = node
+                            max_dist_node2 = other_node
+                if max_dist_node1.get_x() > max_dist_node2.get_x():
+                    right_node = max_dist_node1
+                    left_node = max_dist_node2
+                else:
+                    left_node = max_dist_node1
+                    right_node = max_dist_node2
+                # Determine the maximum horizontal and vertical distance between these two nodes.
+                max_distance_delta_x = right_node.get_x() - left_node.get_x()
+                max_distance_delta_y = right_node.get_y() - left_node.get_y()
+                # Find the center between these two nodes, it becomes the center of rotation.
+                rotation_center_x = 0.5 * (left_node.get_x() + right_node.get_x())
+                rotation_center_y = 0.5 * (left_node.get_y() + right_node.get_y())
+                # The angle of the following rotation is determined.
+                # The following two cases are treated seperately in order to avoid division by zero.
+                # Find the current (unscaled) min and max of x and y.
+                # In the last case, the arctan helps to find the rotation angle.
+                if max_distance_delta_y == 0.0:
+                    w = 0
+                elif max_distance_delta_x == 0.0:
+                    w = 0.5 * math.pi
+                elif max_distance_delta_y < 0.0:
+                    w = math.atan(-max_distance_delta_y/max_distance_delta_x)
+                elif max_distance_delta_y > 0.0:
+                    w = - math.atan(max_distance_delta_y/max_distance_delta_x)
+                # Finally, the rotation is performed on all nodes.
+                for node in self.nodes:
+                    node.rotate(w, rotation_center_x, rotation_center_y)
+            # After the rotation, get once more the dimensions of the graph.
+            unscaled_min_x = 0
+            unscaled_max_x = 0
+            unscaled_min_y = 0
+            unscaled_max_y = 0
+            for node in self.nodes:
+                if node.get_x() - node.get_radius(minimum_node_size) < unscaled_min_x:
+                    unscaled_min_x = node.get_x() - node.get_radius(minimum_node_size)
+                if node.get_x() + node.get_radius(minimum_node_size) > unscaled_max_x:
+                    unscaled_max_x = node.get_x() + node.get_radius(minimum_node_size)
+                if node.get_y() - node.get_radius(minimum_node_size) < unscaled_min_y:
+                    unscaled_min_y = node.get_y() - node.get_radius(minimum_node_size)
+                if node.get_y() + node.get_radius(minimum_node_size) > unscaled_max_y:
+                    unscaled_max_y = node.get_y() + node.get_radius(minimum_node_size)
+            # Determine the scale factor for all x and y values.
+            scale_factor_x = (dim_x - 2*margin)/(unscaled_max_x - unscaled_min_x)
+            scale_factor_y = (dim_y - 2*margin)/(unscaled_max_y - unscaled_min_y)
+            scale_factor = scale_factor_x
+            if scale_factor_y < scale_factor:
+                scale_factor = scale_factor_y
+            scaled_range_x = scale_factor*(unscaled_max_x - unscaled_min_x)
+            scaled_range_y = scale_factor*(unscaled_max_y - unscaled_min_y)
+            # Determine the extra margin on the left or on the top (one of them is 0).
+            extra_x_margin = ((dim_x - 2*margin) - scaled_range_x)/2
+            extra_y_margin = ((dim_y - 2*margin) - scaled_range_y)/2
+            # Reposition all nodes based on extra margin and scaling factor.
+            for node in self.nodes:
+                node_x = node.get_x() - unscaled_min_x
+                node_y = node.get_y() - unscaled_min_y
+                node_radius = node.get_radius(minimum_node_size)
+                node.set_x(margin + extra_x_margin + scale_factor * node_x)
+                node.set_y(margin + extra_y_margin + scale_factor * node_y)
+                node.set_radius(node_radius * scale_factor)
+            # Check once more the top and bottom margins, now after all scaling:
+            top_margin = dim_y
+            bottom_margin = dim_y
+            for node in self.nodes:
+                if node.get_y() - node.get_radius(minimum_node_size) < top_margin:
+                    top_margin = node.get_y() - node.get_radius(minimum_node_size)
+                if dim_y - (node.get_y() + node.get_radius(minimum_node_size)) < bottom_margin:
+                    bottom_margin = dim_y - (node.get_y() + node.get_radius(minimum_node_size))
+            adjusted_top_margin = top_margin % 10 + 10
+            adjusted_bottom_margin = bottom_margin % 10 + 10
+            top_margin_to_be_removed = top_margin - adjusted_top_margin
+            bottom_margin_to_be_removed = bottom_margin - adjusted_bottom_margin
+            dim_y = int(dim_y - (top_margin_to_be_removed + bottom_margin_to_be_removed))
+            for node in self.nodes:
+                node_y = node.get_y()
+                node.set_y(node_y - top_margin_to_be_removed)
+
+            # Definitions for the svg.
+            stroke_width = 1.0
+            stroke_color = '93a1a1' # base1
+            font_color = '002b36'  # base03
+            font_unit = 10
+            font = '\'Helvetica\''
+            text_y_correction = 0.35
+            dot_radius = 1
+
+            # Start writing the svg string.
+            svg_string = ''
+            svg_string += '<!-- The haplotype genealogy graph: info start -->\n'
+            svg_string += '<!-- Populations:\n'
+            for x in range(0,len(pops)):
+                if x < len(colors):
+                    svg_string += pops[x] + ': #' + colors[x] + '\n'
+                else:
+                    svg_string += pops[x] + ': #' + rest_color + '\n'
+            svg_string += '-->\n'
+            svg_string += '<!-- The haplotype genealogy graph: info end -->\n'
+            svg_string += '<!-- The haplotype genealogy graph: SVG string start -->\n'
+            svg_string += '<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"'
+            svg_string += str(dim_x)
+            svg_string += '\" height=\"'
+            svg_string += str(dim_y)
+            svg_string += '\" viewBox=\"'
+            svg_string += '0 0 '
+            svg_string += str(dim_x)
+            svg_string += ' '
+            svg_string += str(dim_y)
+            svg_string += '\" xmlns:xlink=\"htttp://www.w3.org/1999/xlink\">\n\n'
+            svg_string += '  <defs>\n'
+            svg_string += '    <style type=\"text/css\">\n'
+            svg_string += '      <![CDATA[\n'
+            svg_string += '        text {font-weight:normal; fill:#'
+            svg_string += font_color
+            svg_string += ';}\n'
+            svg_string += '        line {fill:none; stroke:#'
+            svg_string += stroke_color
+            svg_string += '; stroke-width:'
+            svg_string += str(stroke_width)
+            svg_string += 'px;}\n'
+            svg_string += '        circle {stroke:#'
+            svg_string += stroke_color
+            svg_string += '; stroke-width:'
+            svg_string += str(stroke_width)
+            svg_string += 'px;}\n'
+            svg_string += '      ]]>\n'
+            svg_string += '    </style>\n\n'
+            svg_string += '    <radialGradient id=\"radgrad\"\n'
+            svg_string += '      cx=\".9\" cy=\".1\" r=\"1\">\n'
+            svg_string += '      <stop  offset=\"0\" style=\"stop-color:grey\"/>\n'
+            svg_string += '      <stop  offset=\"1\" style=\"stop-color:black\"/>\n'
+            svg_string += '    </radialGradient>\n\n'
+            svg_string += '    <!--Masks-->\n'
+            count = 0
+            for node in self.nodes:
+                svg_string += '    <mask id=\"m_'
+                svg_string += str(count)
+                svg_string += '\"><circle fill=\"url(#radgrad)\" cx=\"'
+                svg_string += str(node.get_x())
+                svg_string += '\" cy=\"'
+                svg_string += str(node.get_y())
+                svg_string += '\" r=\"'
+                svg_string += str(node.get_radius(minimum_node_size))
+                svg_string += '\"/></mask>\n'
+                count += 1
+            svg_string += '  </defs>\n\n'
+
+            # Add edges.
+            svg_string += '  <!--Edges-->\n'
+            for edge in self.edges:
+                edge_node_ids = edge.get_node_ids()
+                for node in self.nodes:
+                    if node.get_id() == edge_node_ids[0]:
+                        x1 = node.get_x()
+                        y1 = node.get_y()
+                    elif node.get_id() == edge_node_ids[1]:
+                        x2 = node.get_x()
+                        y2 = node.get_y()
+                svg_string += '  <line x1=\"'
+                svg_string += str(x1)
+                svg_string += '\" y1=\"'
+                svg_string += str(y1)
+                svg_string += '\" x2=\"'
+                svg_string += str(x2)
+                svg_string += '\" y2=\"'
+                svg_string += str(y2)
+                svg_string += '\"/>\n'
+            svg_string += '\n'
+
+            # Add dots to edges to mark substitutions.
+            svg_string += '  <!--Dots-->\n'
+            for edge in self.edges:
+                if edge.get_fitch_distance() > 1:
+                    edge_node_ids = edge.get_node_ids()
+                    for node in self.nodes:
+                        if node.get_id() == edge_node_ids[0]:
+                            node1_x = node.get_x()
+                            node1_y = node.get_y()
+                            node1_r = node.get_radius(minimum_node_size)
+                        elif node.get_id() == edge_node_ids[1]:
+                            node2_x = node.get_x()
+                            node2_y = node.get_y()
+                            node2_r = node.get_radius(minimum_node_size)
+                    if node2_x > node1_x:
+                        left_node_x = node1_x
+                        left_node_y = node1_y
+                        left_node_r = node1_r
+                        right_node_x = node2_x
+                        right_node_y = node2_y
+                        right_node_r = node2_r
+                    else:
+                        right_node_x = node1_x
+                        right_node_y = node1_y
+                        right_node_r = node1_r
+                        left_node_x = node2_x
+                        left_node_y = node2_y
+                        left_node_r = node2_r
+                    edge_delta_x = right_node_x - left_node_x
+                    edge_delta_y = right_node_y - left_node_y
+                    edge_total_length = math.sqrt(edge_delta_x**2 + edge_delta_y**2)
+                    edge_unit_delta_x = edge_delta_x / edge_total_length
+                    edge_unit_delta_y = edge_delta_y / edge_total_length
+                    if edge_delta_y == 0: # edge is horizontal.
+                        start_x = left_node_x + left_node_r
+                        start_y = left_node_y
+                        end_x = right_node_x - right_node_r
+                        end_y = right_node_y
+                    elif edge_delta_y > 0: # edge goes down.
+                        if edge_delta_x == 0: # edge goes down vertically.
+                            start_x = left_node_x
+                            start_y = left_node_y + left_node_r
+                            end_x = right_node_x
+                            end_y = right_node_x - right_node_r
+                        else: # edge goes down, but not vertically.
+                            start_x = left_node_x + edge_unit_delta_x * left_node_r
+                            start_y = left_node_y + edge_unit_delta_y * left_node_r
+                            end_x = right_node_x - edge_unit_delta_x * right_node_r
+                            end_y = right_node_y - edge_unit_delta_y * right_node_r
+                    else: # edge goes up.
+                        if edge_delta_x == 0: # edge goes up vertically.
+                            start_x = left_node_x
+                            start_y = left_node_y - left_node_r
+                            end_x = right_node_x
+                            end_y = right_node_x + right_node_r
+                        else: # edge goes up, but not vertically.
+                            start_x = left_node_x + edge_unit_delta_x * left_node_r
+                            start_y = left_node_y + edge_unit_delta_y * left_node_r
+                            end_x = right_node_x - edge_unit_delta_x * right_node_r
+                            end_y = right_node_y - edge_unit_delta_y * right_node_r
+                    substitution_x = (end_x - start_x)/edge.get_fitch_distance()
+                    substitution_y = (end_y - start_y)/edge.get_fitch_distance()
+                    for i in range(edge.get_fitch_distance()-1):
+                        dot_x = start_x + (i+1) * substitution_x
+                        dot_y = start_y + (i+1) * substitution_y
+                        svg_string += '  <circle fill=\"#'
+                        svg_string += stroke_color
+                        svg_string += '\" cx=\"'
+                        svg_string += str(dot_x)
+                        svg_string += '\" cy=\"'
+                        svg_string += str(dot_y)
+                        svg_string += '\" r=\"'
+                        svg_string += str(dot_radius)
+                        svg_string += '\"/>\n'
+            svg_string += '\n'
+
+            # Add the nodes.
+            svg_string += '  <!--Nodes-->\n'
+            count = 0
+            for node in self.nodes:
+                if node.get_size() > 0:
+                    svg_string += '  <!--Haplotype ID: '
+                    svg_string += str(count+1)
+                    svg_string += '-->\n'
+                    svg_string += '  <circle fill=\"#'
+                    svg_string += rest_color
+                    svg_string += '\" cx=\"'
+                    svg_string += str(node.get_x())
+                    svg_string += '\" cy=\"'
+                    svg_string += str(node.get_y())
+                    svg_string += '\" r=\"'
+                    svg_string += str(node.get_radius(minimum_node_size))
+                    svg_string += '\"/>\n'
+                    old_p =  0
+                    new_p = 0
+                    for s in range(len(self.pops)):
+                        proportion = node.get_per_pop_sizes()[s] / node.get_size()
+                        if proportion > 0 and proportion < 1:
+                            new_p = old_p + proportion
+                            pie_start_x = node.get_x() + (node.get_radius(minimum_node_size) - 0.5*stroke_width)*math.sin(old_p*2*math.pi)
+                            pie_start_y = node.get_y() - (node.get_radius(minimum_node_size) - 0.5*stroke_width)*math.cos(old_p*2*math.pi)
+                            pie_stop_x = node.get_x() + (node.get_radius(minimum_node_size) - 0.5*stroke_width)*math.sin(new_p*2*math.pi)
+                            pie_stop_y = node.get_y() - (node.get_radius(minimum_node_size) - 0.5*stroke_width)*math.cos(new_p*2*math.pi)
+                            svg_string += '  <path fill=\"#'
+                            if s >= len(colors):
+                                svg_string += rest_color
+                            else:
+                                svg_string += colors[s]
+                            svg_string += '\" d=\"M '
+                            svg_string += str(node.get_x())
+                            svg_string += ','
+                            svg_string += str(node.get_y())
+                            svg_string += ' L '
+                            svg_string += str(pie_start_x)
+                            svg_string += ','
+                            svg_string += str(pie_start_y)
+                            svg_string += ' A '
+                            svg_string += str(node.get_radius(minimum_node_size) - 0.5*stroke_width)
+                            svg_string += ' '
+                            svg_string += str(node.get_radius(minimum_node_size) - 0.5*stroke_width)
+                            svg_string += ' 0 '
+                            svg_string += str(round(proportion))
+                            svg_string += ' 1 '
+                            svg_string += str(pie_stop_x)
+                            svg_string += ', '
+                            svg_string += str(pie_stop_y)
+                            svg_string += ' z\"/>\n'
+                            old_p = new_p
+                        elif proportion == 1.0:
+                            svg_string += '  <circle fill=\"#'
+                            if colors[s] == None:
+                                svg_string += rest_color
+                            else:
+                                svg_string += colors[s]
+                            svg_string += '\" cx=\"'
+                            svg_string += str(node.get_x())
+                            svg_string += '\" cy=\"'
+                            svg_string += str(node.get_y())
+                            svg_string += '\" r=\"'
+                            svg_string += str(node.get_radius(minimum_node_size))
+                            svg_string += '\"/>\n'
+                        elif proportion > 1 or proportion < 0:
+                            warn_string = ''
+                            warn_string += 'WARNING: A proportion was found to '
+                            warn_string += 'be less than 0 or greater than 1!'
+                            print(warn_string)
+                    svg_string += '\n'
+                else:
+                    svg_string += '  <circle fill=\"#'
+                    svg_string += stroke_color
+                    svg_string += '\" cx=\"'
+                    svg_string += str(node.get_x())
+                    svg_string += '\" cy=\"'
+                    svg_string += str(node.get_y())
+                    svg_string += '\" r=\"'
+                    svg_string += str(dot_radius)
+                    svg_string += '\"/>\n'
+                count += 1
+
+            # Add the gradients.
+            svg_string += '  <!--Gradients-->\n'
+            count = 0
+            for node in self.nodes:
+                svg_string += '  <circle fill=\"white\" cx=\"'
+                svg_string += str(node.get_x())
+                svg_string += '\" cy=\"'
+                svg_string += str(node.get_y())
+                svg_string += '\" r=\"'
+                svg_string += str(node.get_radius(minimum_node_size))
+                svg_string += '\" mask=\"url(#m_'
+                svg_string += str(count)
+                svg_string += ')\"/>\n'
+                count += 1
+            svg_string += '\n'
+
+            # Add the node labels.
+            svg_string += '  <!--Node labels-->\n'
+            count = 0
+            for node in self.nodes:
+                if count < 9:
+                    text_x_correction = -0.2
+                elif count == 10:
+                    text_x_correction = -0.52
+                else:
+                    text_x_correction = -0.60
+                svg_string += '  <text x=\"'
+                svg_string += str(node.get_x() + font_unit * text_x_correction)
+                svg_string += '\" y=\"'
+                svg_string += str(node.get_y() + font_unit * text_y_correction)
+                svg_string += '\" font-family=\"'
+                svg_string += str(font)
+                svg_string += '\" font-size=\"'
+                svg_string += str(font_unit)
+                svg_string += 'px\">'
+                svg_string += str(count+1)
+                svg_string += '</text>\n'
+                count += 1
+            svg_string += '\n'
+
+            # Finish and return the svg string.
+            svg_string += '</svg>\n'
+            svg_string += '<!-- The haplotype genealogy graph: SVG string end -->\n'
+            return svg_string
+
+        # If not a single node exists (cause they all fall below the size limit).
+        else:
+            return 'No nodes found with sufficient size for display!'
+
+    def assign_progeny_ids(self):
+        for node in self.nodes:
+            node_progeny_ids = []
+            node_ids_to_follow = []
+            for child_id in node.get_child_ids():
+                node_progeny_ids.append(child_id)
+                node_ids_to_follow.append(child_id)
+            while len(node_ids_to_follow) > 0:
+                for node_id_to_follow in node_ids_to_follow:
+                    node_ids_to_follow.remove(node_id_to_follow)
+                    for progeny_node in self.nodes:
+                        if progeny_node.get_id() == node_id_to_follow:
+                            for child_id in progeny_node.get_child_ids():
+                                node_progeny_ids.append(child_id)
+                                node_ids_to_follow.append(child_id)
+            node.set_progeny_ids(node_progeny_ids)
+
+    def get_number_of_internal_nodes(self):
+        number_of_internal_nodes = 0
+        for node in self.nodes:
+            if 'internalNode' in node.get_id():
+                number_of_internal_nodes += 1
+        return number_of_internal_nodes
+
+    def get_gsi(self, pop):
+        pop_terminals = []
+        for node in self.nodes:
+            if pop in node.get_id():
+                pop_terminals.append(node.get_id())
+        gsis = []
+        if len(pop_terminals) == 0:
+            return None
+        if len(pop_terminals) == 1:
+            return 1
+        else:
+            for node in self.nodes:
+                if 'internalNode' in node.get_id():
+                    if node.extant_progeny_ids_contain_all_of(pop_terminals):
+                        number_of_nodes_actually_required = 1
+                        for progeny_id in node.get_progeny_ids():
+                            for progeny_node in self.nodes:
+                                if progeny_node.get_id() == progeny_id:
+                                    if progeny_node.extant_progeny_ids_contain_any_of(pop_terminals):
+                                        number_of_nodes_actually_required += 1
+                    elif node.extant_progeny_ids_contain_none_of(pop_terminals):
+                        number_of_nodes_actually_required = 0
+                        # Find internal nodes that are above this node (but exclude the root).
+                        for anti_progeny_node in self.nodes:
+                            if 'internalNode' in anti_progeny_node.get_id():
+                                if anti_progeny_node.get_id() not in node.get_progeny_ids():
+                                    if anti_progeny_node.get_is_root() == False:
+                                        if anti_progeny_node.extant_progeny_ids_contain_any_of(pop_terminals):
+                                            number_of_nodes_actually_required += 1
+                    else:
+                        number_of_nodes_actually_required = None
+                    if number_of_nodes_actually_required != None:
+                        number_of_nodes_minimally_required = len(pop_terminals) - 1
+                        # The + 1 in the next line is needed since the root is the only node that
+                        # has three children (it's a polytomy).
+                        number_of_nodes_maximally_required = self.get_number_of_internal_nodes() + 1
+                        obs_gs = number_of_nodes_minimally_required/number_of_nodes_actually_required
+                        max_gs = 1
+                        min_gs = number_of_nodes_minimally_required/number_of_nodes_maximally_required
+                        gsi = (obs_gs - min_gs) / (max_gs - min_gs)
+                        gsis.append(gsi)
+            max_gsi = None
+            for gsi in gsis:
+                if gsi != None:
+                    if max_gsi == None:
+                        max_gsi = 0
+                    if gsi > max_gsi:
+                        max_gsi = gsi
+            return max_gsi
+
+    def info(self):
+        info_string = ''
+        info_string += 'Tree'.ljust(20)
+        info_string += '\n'
+        info_string += 'Number of nodes:'.ljust(20)
+        info_string += str(self.get_number_of_nodes())
+        info_string += '\n'
+        info_string += 'Number of edges:'.ljust(20)
+        info_string += str(self.get_number_of_edges())
+        info_string += '\n'
+        return info_string
+
+    def check_edges(self):
+        all_sorted = True
+        for edge in self.edges:
+            edge_node_ids = edge.get_node_ids()
+            for node in self.nodes:
+                if node.get_id() == edge_node_ids[0]:
+                    dist1 = node.get_distance_to_root()
+                elif node.get_id() == edge_node_ids[1]:
+                    dist2 = node.get_distance_to_root()
+            if dist1 > dist2:
+                all_sorted = False
+        return all_sorted
+
+
+# The Node class.
+class Node(object):
+
+    def __init__(self, id, is_root, pops):
+        self.id = id
+        self.is_root = is_root
+        self.sequences = []
+        self.child_ids = []
+        self.number_of_children = 0
+        self.state_sets = []
+        self.states = []
+        self.size = 0
+        self.record_ids = []
+        self.radius = 0
+        self.is_removed = False
+        self.pops = []
+        self.per_pop_sizes = []
+        self.progeny_ids = []
+        self.distance_to_root = None
+        for pop in pops:
+            if pop in self.id:
+                self.pops.append(pop)
+        if self.pops == [] and self.id[:12] != 'internalNode':
+            self.pops.append('unknown')
+        self.x = 'None'
+        self.y = 'None'
+
+    def get_id(self):
+        return self.id
+
+    def set_size(self, size):
+        self.size = size
+        self.set_radius(0.5*math.sqrt(self.size))
+
+    def get_size(self):
+        return self.size
+
+    def increase_size(self, increase_size):
+        self.size += increase_size
+        self.set_radius(0.5*math.sqrt(self.size))
+
+    def add_record_id(self, record_id):
+        self.record_ids.append(record_id)
+
+    def get_record_ids(self):
+        return self.record_ids
+
+    def set_radius(self, radius):
+        self.radius = radius
+
+    def get_radius(self, minimum_node_size):
+        if self.size >= minimum_node_size:
+            return self.radius
+        else:
+            return 0
+
+    def set_x(self, x):
+        self.x = x
+
+    def get_x(self):
+        return self.x
+
+    def set_y(self, y):
+        self.y = y
+
+    def get_y(self):
+        return self.y
+
+    def switch_x_and_y(self):
+        self.x, self.y = self.y, self.x
+
+    def rotate(self, w, rotation_center_x, rotation_center_y):
+        squared_distance_to_center_x = (self.x - rotation_center_x)**2
+        squared_distance_to_center_y = (self.y - rotation_center_y)**2
+        distance_to_center = math.sqrt(squared_distance_to_center_x + squared_distance_to_center_y)
+        old_delta_x = self.x - rotation_center_x
+        old_delta_y = self.y - rotation_center_y
+        if old_delta_y >= 0:
+            new_delta_x = distance_to_center * (math.sin(math.asin(old_delta_x/distance_to_center)-w))
+            self.x = new_delta_x + rotation_center_x
+        else:
+            new_delta_x = distance_to_center * (-math.sin(math.asin(-old_delta_x/distance_to_center)-w))
+            self.x = new_delta_x + rotation_center_x
+        if old_delta_x <= 0:
+            new_delta_y = distance_to_center * (math.sin(math.asin(old_delta_y/distance_to_center)-w))
+            self.y = new_delta_y + rotation_center_y
+        else:
+            new_delta_y = distance_to_center * (-math.sin(math.asin(-old_delta_y/distance_to_center)-w))
+            self.y = new_delta_y + rotation_center_y
+
+    def set_sequences(self, sequences):
+        self.sequences = sequences
+
+    def add_sequence(self, sequence):
+        self.sequences.append(sequence)
+
+    def get_sequences(self):
+        return self.sequences
+
+    def set_parent_id(self, parent_id):
+        self.parent_id = parent_id
+
+    def get_parent_id(self):
+        return self.parent_id
+
+    def add_child_id(self, child_id):
+        self.number_of_children += 1
+        self.child_ids.append(child_id)
+
+    def remove_child_id(self, child_id):
+        self.number_of_children -= 1
+        self.child_ids.remove(child_id)
+
+    def get_child_ids(self):
+        return self.child_ids
+
+    def get_number_of_children(self):
+        return self.number_of_children
+
+    def set_pops(self, pops):
+        self.pops = pops
+
+    def get_pops(self):
+        return self.pops
+
+    def add_pop(self, pop):
+        self.pops.append(pop)
+
+    def set_per_pop_sizes(self, pops):
+        pop_pos = 0
+        for pop in pops:
+            this_pop_count = 0
+            for own_pop in self.pops:
+                if own_pop == pop:
+                    this_pop_count += 1
+            self.per_pop_sizes.append(this_pop_count)
+            pop_pos += 1
+
+    def get_per_pop_sizes(self):
+        return self.per_pop_sizes
+
+    def set_distance_to_root(self, distance_to_root):
+        self.distance_to_root = distance_to_root
+
+    def get_distance_to_root(self):
+        return self.distance_to_root
+
+    def set_is_root(self, is_root):
+        self.is_root = is_root
+
+    def get_is_root(self):
+        if self.is_root == True:
+            return True
+        else:
+            return False
+
+    def prepare_state_sets(self, seq_length):
+        for x in range(seq_length):
+            self.state_sets.append(['None'])
+
+    def set_state_set(self, pos, state):
+        self.state_sets[pos] = state
+
+    def get_state_set(self, pos):
+        return self.state_sets[pos]
+
+    def prepare_states(self, seq_length):
+        for x in range(seq_length):
+            self.states.append('None')
+
+    def set_state(self, pos, state):
+        self.states[pos] = state
+
+    def get_state(self, pos):
+        return self.states[pos]
+
+    def convert_states_to_sequence(self):
+        seq_string = ''
+        for state in self.states:
+            seq_string += state
+        if self.sequences == []:
+            self.sequences.append(seq_string)
+        else:
+            self.sequences[0] = seq_string
+
+    def set_is_removed(self, is_removed):
+        if is_removed == True:
+            self.is_removed = True
+        elif is_removed == False:
+            self.is_removed = False
+        else:
+            print('WARNING: Unexpected value for boolean variable.')
+
+    def get_is_removed(self):
+        return self.is_removed
+
+    def set_progeny_ids(self, progeny_ids):
+        self.progeny_ids = progeny_ids
+
+    def get_progeny_ids(self):
+        return self.progeny_ids
+
+    def get_extant_progeny_ids(self):
+        if self.progeny_ids == []:
+            return []
+        else:
+            extant_progeny_ids = []
+            for progeny_id in self.progeny_ids:
+                if 'internalNode' not in progeny_id:
+                    extant_progeny_ids.append(progeny_id)
+            return extant_progeny_ids
+
+    def extant_progeny_ids_contain_all_of(self, terminal_ids):
+        extant_progeny_ids_contain_all = True
+        for terminal_id in terminal_ids:
+            if terminal_id not in self.get_extant_progeny_ids():
+                extant_progeny_ids_contain_all = False
+        return extant_progeny_ids_contain_all
+
+    def extant_progeny_ids_contain_any_of(self, terminal_ids):
+        extant_progeny_ids_contain_any = False
+        for terminal_id in terminal_ids:
+            if terminal_id in self.get_extant_progeny_ids():
+                extant_progeny_ids_contain_any = True
+        return extant_progeny_ids_contain_any
+
+    def extant_progeny_ids_contain_none_of(self, terminal_ids):
+        extant_progeny_ids_contain_none = True
+        for terminal_id in terminal_ids:
+            if terminal_id in self.get_extant_progeny_ids():
+                extant_progeny_ids_contain_none = False
+        return extant_progeny_ids_contain_none
+
+    def info(self):
+        info_string = ''
+        info_string += 'Node id:'.ljust(20)
+        info_string += self.id
+        info_string += '\n'
+        info_string += 'Root:'.ljust(20)
+        info_string += str(self.is_root)
+        info_string += '\n'
+        info_string += 'Parent id:'.ljust(20)
+        info_string += str(self.parent_id)
+        info_string += '\n'
+        info_string += 'Child ids:'.ljust(20)
+        if len(self.child_ids) > 0:
+            for child_id in self.child_ids:
+                info_string += child_id
+                info_string += ', '
+            info_string = info_string[:-2]
+        else:
+            info_string += 'None'
+        info_string += '\n'
+        info_string += 'Extant progeny ids:'.ljust(20)
+        extant_progeny_ids = self.get_extant_progeny_ids()
+        if len(extant_progeny_ids) > 0:
+            for extant_progeny_id in extant_progeny_ids:
+                info_string += extant_progeny_id
+                info_string += ', '
+            info_string = info_string[:-2]
+        else:
+            info_string += 'None'
+        info_string += '\n'
+        info_string += 'Distance to root:'.ljust(20)
+        info_string += str(self.distance_to_root)
+        info_string += '\n'
+        info_string += 'Size:'.ljust(20)
+        info_string += str(self.size)
+        info_string += '\n'
+        info_string += 'Radius:'.ljust(20)
+        info_string += str(self.radius)
+        info_string += '\n'
+        info_string += 'Pops:'.ljust(20)
+        if len(self.pops) > 0:
+            for pop in self.pops:
+                info_string += pop
+                info_string += ', '
+            info_string = info_string[:-2]
+        else:
+            info_string += 'None'
+        info_string += '\n'
+        info_string += 'Pop sizes:'.ljust(20)
+        if len(self.per_pop_sizes) > 0:
+            for pop_size in self.per_pop_sizes:
+                info_string += str(pop_size)
+                info_string += ', '
+            info_string = info_string[:-2]
+        else:
+            info_string += 'None'
+        info_string += '\n'
+        info_string += 'Sequences:'.ljust(20)
+        if self.sequences != []:
+            sequence_string = ''
+            for sequence in self.sequences:
+                sequence_string += sequence + ', '
+            sequence_string = sequence_string[:-2]
+            info_string += sequence_string
+        else:
+            info_string += 'None'
+        info_string += '\n'
+        # info_string += 'State sets:'.ljust(20)
+        # for state_set in self.state_sets:
+        #     info_string += '['
+        #     for state in state_set:
+        #         info_string += state
+        #         info_string += ','
+        #     info_string = info_string[:-1]
+        #     info_string += ']'
+        # info_string += '\n'
+        info_string += 'Coordinates:'.ljust(20)
+        info_string += str(self.x)
+        info_string += ', '
+        info_string += str(self.y)
+        info_string += '\n'
+        return info_string
+
+
+# The Edge class.
+class Edge(object):
+
+    def __init__(self, id):
+        self.id = id
+        self.node_ids = []
+        self.is_removed = False
+        self.unit_delta_x = None
+        self.unit_delta_y = None
+        self.fitch_distance = None
+
+    def get_id(self):
+        return self.id
+
+    def set_node_ids(self, node_ids):
+        self.node_ids = node_ids
+
+    def get_node_ids(self):
+        return self.node_ids
+
+    def set_length(self, length):
+        self.length = length
+
+    def get_length(self):
+        return self.length
+
+    def set_fitch_distance(self, fitch_dist):
+        self.fitch_distance = fitch_dist
+
+    def get_fitch_distance(self):
+        return self.fitch_distance
+
+    def set_unit_delta_x(self, unit_delta_x):
+        self.unit_delta_x = unit_delta_x
+
+    def get_unit_delta_x(self):
+        return self.unit_delta_x
+
+    def set_unit_delta_y(self, unit_delta_y):
+        self.unit_delta_y = unit_delta_y
+
+    def get_unit_delta_y(self):
+        return self.unit_delta_y
+
+    def set_is_removed(self, is_removed):
+        if is_removed == True:
+            self.is_removed = True
+        elif is_removed == False:
+            self.is_removed = False
+        else:
+            print('WARNING: Unexpected value for boolean variable.')
+
+    def get_is_removed(self):
+        return self.is_removed
+
+    def info(self):
+        info_string = ''
+        info_string += 'Edge id:'.ljust(20)
+        info_string += self.id
+        info_string += '\n'
+        info_string += 'Edge node 1 id:'.ljust(20)
+        info_string += self.node_ids[0]
+        info_string += '\n'
+        info_string += 'Edge node 2 id:'.ljust(20)
+        info_string += self.node_ids[1]
+        info_string += '\n'
+        info_string += 'Edge length:'.ljust(20)
+        info_string += str(self.length)
+        info_string += '\n'
+        info_string += 'Unit delta x:'.ljust(20)
+        info_string += str(self.unit_delta_x)
+        info_string += '\n'
+        info_string += 'Unit delta y:'.ljust(20)
+        info_string += str(self.unit_delta_y)
+        info_string += '\n'
+        if self.fitch_distance != None:
+            info_string += 'Fitch distance:'.ljust(20)
+            info_string += str(self.fitch_distance)
+            info_string += '\n'
+        return info_string
+
+
+# Expand the class Seq to include a distance measure method.
+class XSeq(Seq):
+
+    def get_distance_to(self, seq, transversions_only):
+        distance = 0
+        if len(self) != len(seq):
+            print("Both sequences must be of the same length!")
+            sys.exit(0)
+        for x in range(0,len(self)):
+            if transversions_only:
+                if self[x] in ['A', 'G', 'R']:
+                    if seq[x] in ['A', 'G', 'S', 'K', 'B', 'W', 'R', 'M', 'D', 'H', 'V', 'N', '-', '?']:
+                        distance += 0
+                    elif seq[x] in ['C', 'T', 'Y']:
+                        distance += 1
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] in ['C', 'T', 'Y']:
+                    if seq[x] in ['C', 'T', 'Y', 'S', 'K', 'B', 'W', 'M', 'D', 'H', 'V', 'N', '-', '?']:
+                        distance += 0
+                    elif seq[x] in ['A', 'G', 'R']:
+                        distance += 1
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] in ['S', 'K', 'B', 'W', 'M', 'D', 'H', 'V', 'N', '-', '?']:
+                    distance += 0
+                else:
+                    print("Found unexpected base!")
+            else:
+                if self[x] == 'A':
+                    if seq[x] == 'A':
+                        distance += 0
+                    elif seq[x] in ['C', 'G', 'T', 'Y', 'S', 'K', 'B']:
+                        distance += 1
+                    elif seq[x] in ['W', 'R', 'M']:
+                        distance += 1/2
+                    elif seq[x] in ['D', 'H', 'V']:
+                        distance += 2/3
+                    elif seq[x] in ['N', '-', '?']:
+                        distance += 3/4
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] == 'C':
+                    if seq[x] == 'C':
+                        distance += 0
+                    elif seq[x] in ['A', 'G', 'T', 'R', 'W', 'K', 'D']:
+                        distance += 1
+                    elif seq[x] in ['Y', 'S', 'M']:
+                        distance += 1/2
+                    elif seq[x] in ['B', 'H', 'V']:
+                        distance += 2/3
+                    elif seq[x] in ['N', '-', '?']:
+                        distance += 3/4
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] == 'G':
+                    if seq[x] == 'G':
+                        distance += 0
+                    elif seq[x] in ['A', 'C', 'T', 'Y', 'W', 'M', 'H']:
+                        distance += 1
+                    elif seq[x] in ['R', 'S', 'K']:
+                        distance += 1/2
+                    elif seq[x] in ['B', 'D', 'V']:
+                        distance += 2/3
+                    elif seq[x] in ['N', '-', '?']:
+                        distance += 3/4
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] == 'T':
+                    if seq[x] == 'T':
+                        distance += 0
+                    elif seq[x] in ['A', 'C', 'G', 'R', 'S', 'M', 'V']:
+                        distance += 1
+                    elif seq[x] in ['Y', 'W', 'K']:
+                        distance += 1/2
+                    elif seq[x] in ['B', 'D', 'H']:
+                        distance += 2/3
+                    elif seq[x] in ['N', '-', '?']:
+                        distance += 3/4
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] == 'R':
+                    if seq[x] in ['C', 'T', 'Y']:
+                        distance += 1
+                    elif seq[x] in ['A', 'G', 'R']:
+                        distance += 1/2
+                    elif seq[x] in ['S', 'W', 'K', 'M']:
+                        distance += 3/4
+                    elif seq[x] in ['D', 'V']:
+                        distance += 1/3
+                    elif seq[x] in ['B', 'H']:
+                        distance += 5/6
+                    elif seq[x] in ['N', '-', '?']:
+                        distance += 3/4
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] == 'Y':
+                    if seq[x] in ['A', 'G', 'R']:
+                        distance += 1
+                    elif seq[x] in ['C', 'T', 'Y']:
+                        distance += 1/2
+                    elif seq[x] in ['S', 'W', 'K', 'M']:
+                        distance += 3/4
+                    elif seq[x] in ['B', 'H']:
+                        distance += 2/3
+                    elif seq[x] in ['D', 'V']:
+                        distance += 5/6
+                    elif seq[x] in ['N', '-', '?']:
+                        distance += 3/4
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] == 'S':
+                    if seq[x] in ['A', 'T', 'W']:
+                        distance += 1
+                    elif seq[x] in ['C', 'G', 'S']:
+                        distance += 1/2
+                    elif seq[x] in ['R', 'Y', 'K', 'M']:
+                        distance += 3/4
+                    elif seq[x] in ['B', 'V']:
+                        distance += 2/3
+                    elif seq[x] in ['D', 'H']:
+                        distance += 5/6
+                    elif seq[x] in ['N', '-', '?']:
+                        distance += 3/4
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] == 'W':
+                    if seq[x] in ['C', 'G', 'S']:
+                        distance += 1
+                    elif seq[x] in ['A', 'T', 'W']:
+                        distance += 1/2
+                    elif seq[x] in ['R', 'Y', 'K', 'M']:
+                        distance += 3/4
+                    elif seq[x] in ['D', 'H']:
+                        distance += 2/3
+                    elif seq[x] in ['B', 'V']:
+                        distance += 5/6
+                    elif seq[x] in ['N', '-', '?']:
+                        distance += 3/4
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] == 'K':
+                    if seq[x] in ['A', 'C', 'M']:
+                        distance += 1
+                    elif seq[x] in ['G', 'T', 'K']:
+                        distance += 1/2
+                    elif seq[x] in ['R', 'Y', 'S', 'W']:
+                        distance += 3/4
+                    elif seq[x] in ['B', 'D']:
+                        distance += 2/3
+                    elif seq[x] in ['H', 'V']:
+                        distance += 5/6
+                    elif seq[x] in ['N', '-', '?']:
+                        distance += 3/4
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] == 'M':
+                    if seq[x] in ['G', 'T', 'K']:
+                        distance += 1
+                    elif seq[x] in ['A', 'C', 'M']:
+                        distance += 1/2
+                    elif seq[x] in ['R', 'Y', 'S', 'W']:
+                        distance += 3/4
+                    elif seq[x] in ['H', 'V']:
+                        distance += 2/3
+                    elif seq[x] in ['B', 'D']:
+                        distance += 5/6
+                    elif seq[x] in ['N', '-', '?']:
+                        distance += 3/4
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] == 'B':
+                    if seq[x] == 'A':
+                        distance += 1
+                    elif seq[x] in ['C', 'G', 'T', 'Y', 'S', 'K', 'B']:
+                        distance += 2/3
+                    elif seq[x] in ['R', 'W', 'M']:
+                        distance += 5/6
+                    elif seq[x] in ['D', 'H', 'V']:
+                        distance += 7/9
+                    elif seq[x] in ['N', '-', '?']:
+                        distance += 3/4
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] == 'D':
+                    if seq[x] == 'C':
+                        distance += 1
+                    elif seq[x] in ['A', 'G', 'T', 'R', 'W', 'K', 'D']:
+                        distance += 2/3
+                    elif seq[x] in ['Y', 'S', 'M']:
+                        distance += 5/6
+                    elif seq[x] in ['B', 'H', 'V']:
+                        distance += 7/9
+                    elif seq[x] in ['N', '-', '?']:
+                        distance += 3/4
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] == 'H':
+                    if seq[x] == 'G':
+                        distance += 1
+                    elif seq[x] in ['A', 'C', 'T', 'Y', 'W', 'M', 'H']:
+                        distance += 2/3
+                    elif seq[x] in ['R', 'S', 'K']:
+                        distance += 5/6
+                    elif seq[x] in ['B', 'D', 'V']:
+                        distance += 7/9
+                    elif seq[x] in ['N', '-', '?']:
+                        distance += 3/4
+                    else:
+                        print("Found unexpected base!")
+                elif self[x] == 'V':
+                    if seq[x] == 'T':
+                        distance += 1
+                    elif seq[x] in ['A', 'C', 'G', 'R', 'S', 'M', 'H']:
+                        distance += 2/3
+                    elif seq[x] in ['Y', 'W', 'K']:
+                        distance += 5/6
+                    elif seq[x] in ['B', 'D', 'H']:
+                        distance += 7/9
+                    elif seq[x] in ['N', '-', '?']:
+                        distance += 3/4
+                    else:
+                        print("Found unexpected base!")
+                else:
+                    print("Found unexpected base!")
+        return distance
+
+
+# Expand the class MultipleSeqAlignment in order to add more statistics.
+class XMultipleSeqAlignment(MultipleSeqAlignment):
+
+    def get_number_of_records(self, pop=None):
+        number_of_records_for_this_pop = 0
+        for y in range(0,len(self)):
+            if pop == None or pop in self[y].id:
+                number_of_records_for_this_pop += 1
+        return number_of_records_for_this_pop
+
+    def all_records_map_uniquely_to_pops(self, pops=None):
+        if pops == None:
+            return False
+        else:
+            unique_map = True
+            for record in self:
+                count = 0
+                for pop in pops:
+                    if pop in record.id:
+                        count += 1
+                if count != 1:
+                    unique_map = False
+            return unique_map
+
+    def get_number_of_variable_sites(self, pop=None):
+        # Find the first sequence of this population.
+        first_included_seq = None
+        record_index = -1
+        while first_included_seq == None and record_index < len(self)-1:
+            record_index += 1
+            if pop == None or pop in self[record_index].id:
+                first_included_seq = self[record_index].seq
+        if first_included_seq == None:
+            return 0
+        else:
+            # Count differences between other included seqs and the first seq.
+            number_of_variable_sites = 0
+            for x in range(0,self.get_alignment_length()):
+                for y in range(1,len(self)):
+                    if pop == None or pop in self[y].id:
+                        if self[y].seq[x] is not first_included_seq[x]:
+                            number_of_variable_sites += 1
+                            break
+            # Return.
+            return number_of_variable_sites
+
+    def get_number_of_unique_genotypes(self, pop=None):
+        seqs = []
+        for record in self:
+            if pop == None or pop in record.id:
+                seqs.append(str(record.seq))
+        return len(set(seqs))
+
+    def get_proportion_of_variable_sites(self, pop=None):
+        return self.get_number_of_variable_sites(pop)/self.get_alignment_length()
+
+    def get_number_of_invariable_sites(self, pop=None):
+        return self.get_alignment_length()-self.get_number_of_variable_sites(pop)
+
+    def get_proportion_of_invariable_sites(self, pop=None):
+        return self.get_number_of_invariable_sites(pop)/self.get_alignment_length() 
+
+    def get_number_of_completely_undetermined_bases(self, pop=None):
+        number_of_completely_undetermined_bases = 0
+        for x in range(0,self.get_alignment_length()):
+            for y in range(0,len(self)):
+                if pop == None or pop in self[y].id:
+                    if self[y].seq[x] is 'N' or self[y].seq[x] is '-' or self[y].seq[x] is '?':
+                        number_of_completely_undetermined_bases += 1
+        return number_of_completely_undetermined_bases
+
+    def get_proportion_of_completely_undetermined_bases(self, pop=None):
+        n_records_for_this_pop = 0
+        for y in range(0,len(self)):
+            if pop == None or pop in self[y].id:
+                n_records_for_this_pop += 1
+        undetermined = self.get_number_of_completely_undetermined_bases(pop)
+        return undetermined/(self.get_alignment_length()*n_records_for_this_pop)
+
+    def get_alleles(self, x, pop=None):
+        alleles = []
+        for y in range(0,len(self)):
+            if pop == None or pop in self[y].id:
+                if self[y].seq[x] is 'A':
+                    alleles.append('A')
+                    alleles.append('A')
+                elif self[y].seq[x] is 'C':
+                    alleles.append('C')
+                    alleles.append('C')
+                elif self[y].seq[x] is 'G':
+                    alleles.append('G')
+                    alleles.append('G')
+                elif self[y].seq[x] is 'T':
+                    alleles.append('T')
+                    alleles.append('T')
+                elif self[y].seq[x] is 'R':
+                    alleles.append('A')
+                    alleles.append('G')
+                elif self[y].seq[x] is 'Y':
+                    alleles.append('C')
+                    alleles.append('T')
+                elif self[y].seq[x] is 'S':
+                    alleles.append('G')
+                    alleles.append('C')
+                elif self[y].seq[x] is 'W':
+                    alleles.append('A')
+                    alleles.append('T')
+                elif self[y].seq[x] is 'K':
+                    alleles.append('G')
+                    alleles.append('T')
+                elif self[y].seq[x] is 'M':
+                    alleles.append('A')
+                    alleles.append('C')
+        return alleles
+
+    def get_mean_expected_heterozygousity(self, pop=None):
+        heterozygosities = []
+        for x in range(0,self.get_alignment_length()):
+            alleles = self.get_alleles(x, pop)
+            unique_alleles = list(set(alleles))
+            if len(unique_alleles) == 1:
+                heterozygosities.append(0)
+            elif len(unique_alleles) == 2:
+                p = alleles.count(unique_alleles[0])/len(alleles)
+                q = alleles.count(unique_alleles[1])/len(alleles)
+                # Following http://www.uwyo.edu/dbmcd/popecol/maylects/fst.html:
+                heterozygosities.append(1 - (p**2 + q**2))
+        if len(heterozygosities) > 0:
+            return sum(heterozygosities)/len(heterozygosities)
+        else:
+            return None
+
+    def get_F_st(self, pops=[]):
+        if len(pops) != 2:
+            print("Exactly two populations must be specified to calculate pairwise F_st!")
+            sys.exit(0)
+        else:
+            pop0_seqs = []
+            pop1_seqs = []
+            for y in range(0,len(self)):
+                if pops[0] in self[y].id:
+                    pop0_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
+                elif pops[1] in self[y].id:
+                    pop1_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
+            if len(pop0_seqs) < 2:
+                return None
+            elif len(pop1_seqs) < 2:
+                return None
+            else:
+                within_variations = []
+                for x in range(0,len(pop0_seqs)-1):
+                    for y in range(x+1,len(pop0_seqs)):
+                        within_variations.append(pop0_seqs[x].get_distance_to(pop0_seqs[y], False))
+                for x in range(0,len(pop1_seqs)-1):
+                    for y in range(x+1,len(pop1_seqs)):
+                        within_variations.append(pop1_seqs[x].get_distance_to(pop1_seqs[y], False))
+                between_variations = []
+                for x in range(0,len(pop0_seqs)-1):
+                    for y in range(0,len(pop1_seqs)):
+                        between_variations.append(pop0_seqs[x].get_distance_to(pop1_seqs[y], False))
+                mean_between_variation = sum(between_variations)/len(between_variations)
+                mean_within_variation = sum(within_variations)/len(within_variations)
+            if mean_between_variation == 0:
+                return None
+            else:
+                return (mean_between_variation-mean_within_variation)/mean_between_variation
+
+    def get_d_xy(self, pops=[]):
+        if len(pops) != 2:
+            print("Exactly two populations must be specified to calculate pairwise d_xy!")
+            sys.exit(0)
+        else:
+            pop0_seqs = []
+            pop1_seqs = []
+            for y in range(0,len(self)):
+                if pops[0] in self[y].id:
+                    pop0_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
+                elif pops[1] in self[y].id:
+                    pop1_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
+            if len(pop0_seqs) < 2:
+                return None
+            elif len(pop1_seqs) < 2:
+                return None
+            else:
+                between_variations = []
+                for x in range(0,len(pop0_seqs)-1):
+                    for y in range(0,len(pop1_seqs)):
+                        between_variations.append(pop0_seqs[x].get_distance_to(pop1_seqs[y], False))
+                d_xy = sum(between_variations)
+                return d_xy
+
+    def get_d_a(self, pops=[]):
+        if len(pops) != 2:
+            print("Exactly two populations must be specified to calculate pairwise d_a!")
+            sys.exit(0)
+        else:
+            pop0_seqs = []
+            pop1_seqs = []
+            for y in range(0,len(self)):
+                if pops[0] in self[y].id:
+                    pop0_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
+                elif pops[1] in self[y].id:
+                    pop1_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
+            if len(pop0_seqs) < 2:
+                return None
+            elif len(pop1_seqs) < 2:
+                return None
+            else:
+                within_variations1 = []
+                for x in range(0,len(pop0_seqs)-1):
+                    for y in range(x+1,len(pop0_seqs)):
+                        within_variations1.append(pop0_seqs[x].get_distance_to(pop0_seqs[y], False))
+                within_variations2 = []
+                for x in range(0,len(pop1_seqs)-1):
+                    for y in range(x+1,len(pop1_seqs)):
+                        within_variations2.append(pop1_seqs[x].get_distance_to(pop1_seqs[y], False))
+                between_variations = []
+                for x in range(0,len(pop0_seqs)-1):
+                    for y in range(0,len(pop1_seqs)):
+                        between_variations.append(pop0_seqs[x].get_distance_to(pop1_seqs[y], False))
+                sum_within1 = sum(within_variations1)
+                sum_within2 = sum(within_variations2)
+                sum_between = sum(between_variations)
+                d_a = sum_between - (sum_within1 + sum_within2)/2
+            if d_a == 0:
+                return None
+            else:
+                return d_a
+
+
+# Parse the command line arguments.
+parser = argparse.ArgumentParser(
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    description=textwrap.dedent('''\
+      %(prog)s
+    -----------------------------------------
+      Reads nexus formatted strings and produces
+      haplotype genealogies using the Fitch algorithm.
+    '''))
+parser.add_argument(
+    '-v', '--version',
+    action='version',
+    version='%(prog)s 0.95')
+parser.add_argument(
+    '-p', '--populations',
+    nargs='*',
+    type=str,
+    help="One or more population identifiers.")
+parser.add_argument(
+    '-f', '--from',
+    nargs=1,
+    type=int,
+    default=[1],
+    dest='start',
+    help="Start position of analysis window (first = 1)"
+    )
+parser.add_argument(
+    '-t', '--to',
+    nargs=1,
+    type=int,
+    default=[-1],
+    dest='end',
+    help="End position of analysis window (first = 1)"
+    )
+parser.add_argument(
+    '-e', '--min-edge-length',
+    nargs=1,
+    type=int,
+    default=[1],
+    dest='min_edge_length',
+    help="Minimum edge length for display in haplotype genealogy"
+    )
+parser.add_argument(
+    '-n', '--min-node-size',
+    nargs=1,
+    type=int,
+    default=[1],
+    dest='min_node_size',
+    help="Minimum node size for display in haplotype genealogy"
+    )
+
+parser.add_argument(
+    '-x', '--transversions-only',
+    action='store_true',
+    dest='transversions_only',
+    help="Ignore transitions and show transversions only"
+    )
+parser.add_argument(
+    'infile',
+    nargs='?',
+    type=argparse.FileType('r'),
+    default='-',
+    help='The input file name.')
+parser.add_argument(
+    'outfile', nargs='?',
+    type=argparse.FileType('w'),
+    default=sys.stdout,
+    help='The output file name.')
+args = parser.parse_args()
+infile = args.infile
+outfile = args.outfile
+window_start_pos = args.start[0]-1
+window_end_pos = args.end[-1]
+minimum_edge_length = args.min_edge_length[0]
+minimum_node_size = args.min_node_size[0]
+transversions_only = args.transversions_only
+
+# Make sure sensible values are specified for the window start and end.
+if window_start_pos < 0:
+    print("The start position of the analysis window must be at least 1!")
+    sys.exit(0)
+elif window_end_pos != -1:
+    if window_end_pos <= window_start_pos:
+        print("The end position of the analysis window must be greater than the start position!")
+        sys.exit(0)
+pops = args.populations
+if infile.isatty():
+    print("No input file specified, and no input piped through stdin!")
+    sys.exit(0)
+
+# Define a color scheme.
+# Colors use the Solarized color scheme of http://ethanschoonover.com/solarized.
+if pops == None:
+    pops = []
+colors = []
+if len(pops) == 1:
+    # base01
+    colors = ['586e75']
+elif len(pops) == 2:
+    # red, cyan
+    colors = ['dc322f', '2aa198']
+elif len(pops) == 3:
+    # red, cyan, violet
+    colors = ['dc322f', '2aa198', '6c71c4']
+elif len(pops) == 4:
+    # red, cyan, violet, yellow
+    colors = ['dc322f', '2aa198', '6c71c4', 'b58900']
+elif len(pops) == 5:
+    # red, cyan, violet, yellow, green
+    colors = ['dc322f', '2aa198', '6c71c4', 'b58900', '859900']
+elif len(pops) == 6:
+    # red, cyan, violet, yellow, green, magenta
+    colors = ['dc322f', '2aa198', '6c71c4', 'b58900', '859900', 'd33682']
+elif len(pops) == 7:
+    # red, cyan, violet, yellow, green, magenta, blue
+    colors = ['dc322f', '2aa198', '6c71c4', 'b58900', '859900', 'd33682', '268bd2']
+elif len(pops) > 7:
+    # yellow, green, cyan, blue, violet, magenta, red, orange
+    colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16']
+rest_color = '93a1a1'
+
+# Parse the input.
+align = None
+tree = None
+inlines = infile.readlines()
+if inlines[0][0] == '#':
+    # Assume the input is in nexus format. Maximally one tree string is read.
+    in_matrix = False
+    in_tree = False
+    records = []
+    for line in inlines:
+        if line.strip() == 'matrix':
+            in_matrix = True
+        elif line.strip() == ';':
+            in_matrix = False
+            in_tree = False
+        elif in_matrix and line.strip() is not '':
+            seq_string = line.split()[1]
+            if window_end_pos == -1:
+                seq_string = seq_string[window_start_pos:]
+            else:
+                seq_string = seq_string[window_start_pos:window_end_pos]
+            records.append(
+                SeqRecord(
+                    Seq(seq_string,
+                        generic_dna),
+                        id = line.split()[0]))
+        elif line.strip() == 'begin trees;':
+            in_tree = True
+        elif line.strip() == 'end;':
+            in_tree = False
+        elif in_tree and line.strip() is not '':
+            tree_string_raw = line
+            tree_patterns = re.search('\(.+\)',tree_string_raw)
+            tree_string = tree_patterns.group(0)
+            tree = Tree(tree_string)
+    align = XMultipleSeqAlignment(records)
+elif inlines[0][0] == "(":
+    # Assume the input is in newick format.
+    tree_string_raw = inlines[0]
+    tree_patterns = re.search('\(.+\)',tree_string_raw)
+    tree_string = tree_patterns.group(0)
+    tree = Tree(tree_string)
+else:
+    print("Unexpected file format!")
+    sys.exit(0)
+
+# Parse the newick tree string.
+tree.parse_newick_string(pops)
+
+# Assign sequences to terminal nodes.
+nodes = tree.get_nodes()
+for node in nodes:
+    for seq in align:
+        if node.get_id() == seq.id:
+            node.set_sequences([str(seq.seq.upper())])
+            break
+
+# Make sure all non-internal nodes have sequences.
+all_seqs_found = True
+for node in nodes:
+    node_id = node.get_id()
+    if node_id[:12] != 'internalNode':
+        if node.get_sequences() == []:
+            print("ERROR: No sequence was found for node " + node_id + "!")
+            all_seqs_found = False
+if all_seqs_found == False:
+    sys.exit(0)
+
+# Reconstruct ancestral sequences using the Fitch algorithm.
+tree.reconstruct_ancestral_sequences()
+
+# Calculate Fitch distances.
+tree.calculate_fitch_distances(transversions_only)
+
+# Find the extant progeny for each edge.
+tree.assign_progeny_ids()
+
+# Calculate gsi values before the tree is reduced.
+gsis = []
+for pop in pops:
+    gsis.append(tree.get_gsi(pop))
+
+# Reduce the tree.
+tree.reduce(minimum_edge_length, minimum_node_size)
+
+# Position the tree.
+tree.position('neato', minimum_node_size)
+
+# Produce the svg tree string.
+svg_string = tree.to_svg(840, 700, 10, minimum_node_size, colors, rest_color)
+
+# Initiate the html output string.
+html_string = ''
+html_string += '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"\n'
+html_string += '"http://www.w3.org/TR/html4/loose.dtd">\n'
+html_string += '<html>\n'
+html_string += '  <head>\n'
+html_string += '    <title>Fitchi results</title>\n'
+html_string += '    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">\n'
+html_string += '\n'
+html_string += '    <style type="text/css">\n'
+html_string += '      a:link { text-decoration:none; color:#000000; }\n'
+html_string += '      a:visited { text-decoration:none; color:#000000; }\n'
+html_string += '      a:hover { text-decoration:none; color:#ffffff; background-color:#000000; }\n'
+html_string += '      a:active { text-decoration:none; color:#ffffff; background-color:#000000; }\n'
+html_string += '      a:focus { text-decoration:none; color:#ffffff; background-color:#000000; }\n'
+html_string += '      #relativeSVG { position:relative; width:840px; height:236px; z-index:2 }\n'
+html_string += '      #absoluteAst { position:absolute; top:20px; left:20px; width:20px; height:20px; z-index:1; background-color:#e05030 }\n'
+html_string += '      td { font-family:helvetica; font-size:12px }\n'
+html_string += '      tr.spaceUnder > td { padding-bottom: 1em; }\n'
+html_string += '      tr.doubleSpaceUnder > td { padding-bottom: 2em; }\n'
+html_string += '      tr.largeSpaceUnder > td { padding-bottom: 8em; }\n'
+html_string += '      tr.smallSpaceUnder > td { padding-bottom: 0.2em; }\n'
+html_string += '      tr.spaceOver > td { padding-top: 1em; }\n'
+html_string += '      tr.spaceOverAndLargeSpaceUnder > td { padding-top: 1em; padding-bottom: 8em; }\n'
+html_string += '    </style>\n'
+html_string += '    <script type="text/javascript">\n'
+html_string += '      <!--\n'
+html_string += '        function legend_toggle () {\n'
+html_string += '          if(document.getElementById("legend").style.display == "none") {\n'
+html_string += '            document.getElementById("legend").style.display = "inline";\n'
+html_string += '          } else {\n'
+html_string += '            document.getElementById("legend").style.display = "none";\n'
+html_string += '          }\n'
+html_string += '          if(document.getElementById("show").style.display == "none") {\n'
+html_string += '            document.getElementById("show").style.display = "inline";\n'
+html_string += '          } else {\n'
+html_string += '            document.getElementById("show").style.display = "none";\n'
+html_string += '          }\n'
+html_string += '          if(document.getElementById("hide").style.display == "none") {\n'
+html_string += '            document.getElementById("hide").style.display = "inline";\n'
+html_string += '          } else {\n'
+html_string += '            document.getElementById("hide").style.display = "none";\n'
+html_string += '          }\n'
+html_string += '        }\n'
+html_string += '      //-->\n'
+html_string += '    </script>\n'
+html_string += '  </head>\n'
+html_string += '\n'
+html_string += '  <body>\n'
+html_string += '    <div align="center">\n'
+html_string += '      <table width="840" border="0" cellpadding="0" cellspacing="0">\n'
+html_string += '        <tr>\n'
+html_string += '          <td style="font-family:helvetica; font-size:54px; font-weight:bold">\n'
+html_string += '            <svg width="50" height="50">\n'
+html_string += '              <defs>\n'
+html_string += '                <radialGradient id="radgrad" cx=".9" cy=".1" r="1">\n'
+html_string += '                  <stop  offset="0" style="stop-color:grey"/>\n'
+html_string += '                  <stop  offset="1" style="stop-color:black"/>\n'
+html_string += '                </radialGradient>\n'
+html_string += '                <mask id="m_0"><circle fill="url(#radgrad)" cx="30.964" cy="31.513" r="11.0695"/></mask>\n'
+html_string += '                <mask id="m_1"><circle fill="url(#radgrad)" cx="39.693" cy="7.257" r="6.257"/></mask>\n'
+html_string += '                <mask id="m_2"><circle fill="url(#radgrad)" cx="43.419" cy="45.559" r="3.44"/></mask>\n'
+html_string += '                <mask id="m_3"><circle fill="url(#radgrad)" cx="7.91" cy="39.167" r="4.769"/></mask>\n'
+html_string += '              </defs>\n'
+html_string += '              <path fill="#94A2A1" stroke="#94A2A1" stroke-width="0.5" d="M32.802,20.593c5.745,0.957,9.882,6.31,9.147,12.25c-0.778,6.312-6.659,10.731-13.029,9.548c-6.298-1.18-10.148-7.31-8.733-13.371C21.521,23.296,27.118,19.643,32.802,20.593z"/>\n'
+html_string += '              <line fill="none" stroke="#94A2A1" stroke-width="0.5" x1="39.693" y1="7.257" x2="30.965" y2="30.919"/>\n'
+html_string += '              <line fill="none" stroke="#94A2A1" stroke-width="0.5" x1="30.965" y1="30.919" x2="7.91" y2="39.04"/>\n'
+html_string += '              <line fill="none" stroke="#94A2A1" stroke-width="0.5" x1="30.965" y1="30.919" x2="43.419" y2="45.559"/>\n'
+html_string += '              <path fill="#2BA199" d="M35.684,21.532c4.153,1.969,6.83,6.438,6.229,11.311c-0.242,1.953-1.007,3.819-2.22,5.4l-8.729-7.324L35.684,21.532z"/>\n'
+html_string += '              <path fill="#859B3B" d="M30.965,30.919l1.834-10.292c1.02,0.17,1.986,0.479,2.885,0.905L30.965,30.919z"/>\n'
+html_string += '              <path fill="#2E8BCB" d="M30.965,30.919l8.729,7.324c-1.652,2.136-4.045,3.601-6.723,4.11L30.965,30.919z"/>\n'
+html_string += '              <path fill="#DC342E" d="M20.376,28.451c0.462-1.582,1.273-3.029,2.349-4.244l8.24,6.711L20.376,28.451z"/>\n'
+html_string += '              <path fill="#D43883" d="M30.965,30.919l-6.627,9.429c-2.32-1.742-3.945-4.395-4.32-7.505c-0.184-1.522-0.045-3.01,0.359-4.392L30.965,30.919z"/>\n'
+html_string += '              <path fill="#6F71B5" d="M28.059,42.163c-1.356-0.367-2.618-0.989-3.721-1.815l6.627-9.429l2.008,11.437C31.268,42.668,29.6,42.58,28.059,42.163z"/>\n'
+html_string += '              <path fill="#CB4E27" d="M30.965,30.919l-8.24-6.711c1.634-1.845,3.878-3.152,6.443-3.581c0.66-0.114,1.326-0.164,1.993-0.153L30.965,30.919z"/>\n'
+html_string += '              <path fill="#B48B2E" d="M31.161,20.474c0.548,0.008,1.096,0.061,1.638,0.153l-1.834,10.292L31.161,20.474z"/>\n'
+html_string += '              <circle fill="#94A2A1" stroke="#94A2A1" stroke-width="0.5" cx="39.693" cy="7.257" r="6.257"/>\n'
+html_string += '              <circle fill="#CB4E27" cx="39.693" cy="7.257" r="6.257"/>\n'
+html_string += '              <path fill="#6F71B5" d="M39.693,7.257l2.311,5.816c-0.715,0.283-1.494,0.44-2.311,0.44c-0.836,0-1.635-0.165-2.362-0.461L39.693,7.257z"/>\n'
+html_string += '              <path fill="#2BA199" d="M39.693,7.257l5.438,3.093c-0.698,1.228-1.803,2.196-3.129,2.723L39.693,7.257z"/>\n'
+html_string += '              <path fill="#859B3B" d="M39.693,7.257V1c3.455,0,6.257,2.801,6.257,6.257c0,1.124-0.298,2.18-0.817,3.093L39.693,7.257z"/>\n'
+html_string += '              <circle fill="#94A2A1" stroke="#94A2A1" stroke-width="0.5" cx="43.419" cy="45.559" r="3.44"/>\n'
+html_string += '              <circle fill="#6F71B5" cx="43.419" cy="45.559" r="3.44"/>\n'
+html_string += '              <circle fill="#94A2A1" stroke="#94A2A1" stroke-width="0.5" cx="7.91" cy="39.167" r="4.769"/>\n'
+html_string += '              <circle fill="#2BA199" cx="7.91" cy="39.167" r="4.769"/>\n'
+html_string += '              <path fill="#DC342E" d="M7.91,39.04l-1.548,4.64c-1.873-0.643-3.221-2.42-3.221-4.513c0-2.634,2.135-4.769,4.769-4.769V39.04z"/>\n'
+html_string += '              <circle fill="#94A2A1" stroke="#94A2A1" stroke-width="0.5" cx="16.361" cy="36.069" r="0.255"/>\n'
+html_string += '              <circle fill="#94A2A1" stroke="#94A2A1" stroke-width="0.5" cx="36.061" cy="17.115" r="0.255"/>\n'
+html_string += '              <circle fill="white" cx="30.964" cy="31.513" r="11.0695" mask="url(#m_0)"/>\n'
+html_string += '              <circle fill="white" cx="39.693" cy="7.257" r="6.257" mask="url(#m_1)"/>\n'
+html_string += '              <circle fill="white" cx="43.419" cy="45.559" r="3.44" mask="url(#m_2)"/>\n'
+html_string += '              <circle fill="white" cx="7.91" cy="39.167" r="4.769" mask="url(#m_3)"/>\n'
+html_string += '            </svg>\n'
+html_string += '            <a name="Fitchi" href="http://www.evoinformatics.eu" style="color:#000000; text-decoration:none; background-color:#ffffff">Fitchi</a><br><br>\n'
+html_string += '          </td>\n'
+html_string += '        </tr>\n'
+
+# The summary section.
+html_string += '        <tr class="smallSpaceUnder">\n'
+html_string += '          <td style="font-size:30px; font-weight:bold">Summary</td>\n'
+html_string += '        </tr>\n'
+html_string += '        <tr class="largeSpaceUnder">\n'
+html_string += '          <td>\n'
+html_string += '            <table width="840" border="0" cellpadding="0" cellspacing="1">\n'
+html_string += '              <tr>\n'
+html_string += '                <td width="160" style="font-weight:bold">File Name</td>\n'
+if infile.name == '<stdin>':
+    html_string += '                <td>STDIN</td>\n'
+else:
+    html_string += '                <td>' + str(infile.name) + '</td>\n'
+html_string += '              </tr>\n'
+html_string += '              <tr>\n'
+html_string += '                <td width="160" style="font-weight:bold"># Sites</td>\n'
+html_string += '                <td>' + str(align.get_alignment_length())
+if window_start_pos != 0 or window_end_pos != -1:
+    html_string += ' (positions '
+    html_string += str(window_start_pos+1) + '-'
+    if window_end_pos == -1:
+        html_string += str(align.get_alignment_length()+window_start_pos)
+    else:
+        html_string += str(window_end_pos)
+    html_string += ')'
+html_string += '</td>\n'
+html_string += '              </tr>\n'
+html_string += '              <tr>\n'
+html_string += '                <td width="160" style="font-weight:bold"># Sequence records</td>\n'
+html_string += '                <td>' + str(align.get_number_of_records())
+if pops != []:
+    pop_string = ' ('
+    for pop in pops:
+        pop_string += str(align.get_number_of_records(pop)) + ' x ' + pop + ', '
+    pop_string = pop_string[:-2]
+    html_string += pop_string + ')'
+html_string += '</td>\n'
+html_string += '              </tr>\n'
+html_string += '            </table>\n'
+html_string += '          </td>\n'
+html_string += '        </tr>\n'
+
+# The haplotype genealogy section.
+html_string += '        <tr class="smallSpaceUnder">\n'
+html_string += '          <td style="font-size:30px; font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/j.1365-294X.2011.05066.x/abstract">Haplotype genealogy</a></td>\n'
+html_string += '        </tr>\n'
+html_string += '        <tr class="spaceUnder">\n'
+html_string += '          <td>\n'
+html_string += '            <table width="840" border="0" cellpadding="0" cellspacing="1">\n'
+
+html_string += '              <tr>\n'
+html_string += '                <td width="160" style="font-weight:bold">Node size</td>\n'
+html_string += '                <td># Sequence records</td>\n'
+html_string += '              </tr>\n'
+html_string += '              <tr>\n'
+html_string += '                <td width="160" style="font-weight:bold">Edge length</td>\n'
+if transversions_only:
+    html_string += '                <td># transversions</td>\n'
+else:
+    html_string += '                <td># substitutions (transitions or transversions)</td>\n'
+html_string += '              </tr>\n'
+
+
+html_string += '              <tr>\n'
+html_string += '                <td width="160" style="font-weight:bold">Minimum node size</td>\n'
+html_string += '                <td>' + str(minimum_node_size) + ' sequence record'
+if minimum_node_size > 1:
+    html_string += 's'
+html_string += '</td>\n'
+html_string += '              </tr>\n'
+html_string += '              <tr>\n'
+html_string += '                <td width="160" style="font-weight:bold">Minimum edge length</td>\n'
+if transversions_only:
+    html_string += '                <td>' + str(minimum_edge_length) + ' transversion'
+else:
+    html_string += '                <td>' + str(minimum_edge_length) + ' substitution'
+if minimum_edge_length > 1:
+    html_string += 's'
+html_string += '</td>\n'
+html_string += '              </tr>\n'
+html_string += '              <tr>\n'
+html_string += '                <td width="160" style="font-weight:bold"># nodes</td>\n'
+html_string += '                <td>' + str(tree.get_number_of_nodes()) + '</td>\n'
+html_string += '              </tr>\n'
+html_string += '              <tr>\n'
+html_string += '                <td width="160" style="font-weight:bold"># edges</td>\n'
+html_string += '                <td>' + str(tree.get_number_of_edges()) + '</td>\n'
+html_string += '              </tr>\n'
+html_string += '              <tr>\n'
+html_string += '                <td width="160" style="font-weight:bold">Total Fitch distance</td>\n'
+html_string += '                <td>'
+total_fitch_distance = 0
+for edge in tree.get_edges():
+    total_fitch_distance += edge.get_fitch_distance()
+if transversions_only:
+    html_string += str(total_fitch_distance) + ' transversions</td>\n'
+else:
+    html_string += str(total_fitch_distance) + ' substitutions</td>\n'
+html_string += '              </tr>\n'
+html_string += '            </table>\n'
+html_string += '          </td>\n'
+html_string += '        </tr>\n'
+html_string += '        <tr>\n'
+html_string += '          <td align="center" style="border: 1px solid black">\n'
+svg_lines = svg_string.split('\n')
+for line in svg_lines:
+    html_string += '            ' + line + '\n'
+html_string += '          </td>\n'
+html_string += '        </tr>\n'
+if len(tree.get_nodes()) > 0:
+    html_string += '        <tr class="spaceOver">\n'
+    html_string += '          <td style="font-weight:bold">\n'
+    html_string += '            <span id="show" style="display:inline">\n'
+    html_string += '              <button onclick="legend_toggle()">Show legend</button>\n'
+    html_string += '            </span>\n'
+    html_string += '            <span id="hide" style="display:none">\n'
+    html_string += '              <button onclick="legend_toggle()">Hide legend</button>\n'
+    html_string += '            </span>\n'
+    html_string += '          </td>\n'
+    html_string += '        </tr>\n'
+html_string += '        <tr class="spaceOverAndLargeSpaceUnder">\n'
+html_string += '          <td align="center">\n'
+html_string += '            <span id="legend" style="display:none;">\n'
+html_string += '              <div style="border-width:1px; border-style:solid; border-color:#000000;">\n'
+html_string += '                <table width="800" cellpadding="0" cellspacing="1">\n'
+html_string += '                  <tr class="spaceOver">\n'
+html_string += '                    <td width="160" style="font-weight:bold; font-family:Courier">Population</td>\n'
+html_string += '                    <td width="80" style="font-weight:bold; font-family:Courier" colspan="2">Color</td>\n'
+html_string += '                    <td width="250" style="font-weight:bold; font-family:Courier"># Nodes with population presence</td>\n'
+html_string += '                    <td width="210" style="font-weight:bold; font-family:Courier">% Presence in non-empty nodes</td>\n'
+html_string += '                  </tr>\n'
+pop_count = 0
+for pop in pops:
+    html_string += '                  <tr>\n'
+    html_string += '                    <td width="160" style="font-family:Courier">' + pop + '</td>\n'
+    if pop_count >= len(colors):
+        html_string += '                    <td width="40" bgcolor="#' + rest_color + '"></td>\n'
+    else:
+        html_string += '                    <td width="40" bgcolor="#' + colors[pop_count] + '"></td>\n'
+    html_string += '                    <td width="40"></td>\n'
+    node_count_with_pop = 0
+    non_empty_node_count = 0
+    for node in tree.get_nodes():
+        if pop in node.get_pops():
+            node_count_with_pop += 1
+        if node.get_size() > 0:
+            non_empty_node_count += 1
+    html_string += '                    <td style="font-family:Courier">' + str(node_count_with_pop) + '</td>\n'
+    if non_empty_node_count > 0:
+        html_string += '                    <td style="font-family:Courier">' + "{0:.2f}".format(100*node_count_with_pop/non_empty_node_count) + '</td>\n'
+    else:
+        html_string += '                    <td style="font-family:Courier">NA</td>\n'
+    html_string += '                  </tr>\n'
+    pop_count += 1
+html_string += '                  <tr class="doubleSpaceUnder">\n'
+html_string += '                    <td colspan="5"></td>\n'
+html_string += '                  </tr>\n'
+html_string += '                </table>\n'
+html_string += '                <table width="800" cellpadding="0" cellspacing="1">\n'
+nodes = tree.get_nodes()
+node_count = 0
+for node in nodes:
+    html_string += '                  <tr>\n'
+    html_string += '                    <td width="160" style="font-weight:bold; font-family:Courier">Node ' + str(node_count+1) + '</td>\n'
+    html_string += '                    <td></td>\n'
+    html_string += '                  </tr>\n'
+    html_string += '                  <tr>\n'
+    html_string += '                    <td valign="top" style="font-family:Courier">Sequence'
+    if len(set(node.get_sequences())) > 1:
+        html_string += 's'
+    html_string += ': </td>\n'
+    html_string += '                    <td style="font-family:Courier">\n'
+    html_string += '                      <div style="width: 640px; overflow: auto;">\n'
+    sequence_string = ''
+    for sequence in set(node.get_sequences()):
+        sequence_string += '                      ' + sequence + ',<br>\n'
+    sequence_string = sequence_string[:-6]
+    html_string += sequence_string
+    html_string += '\n'
+    html_string += '                      </div>\n'
+    html_string += '                    </td>\n'
+    html_string += '                  </tr>\n'
+    html_string += '                  <tr>\n'
+    html_string += '                    <td style="font-family:Courier">Size: </td>\n'
+    html_string += '                    <td style="font-family:Courier">' + str(node.get_size()) + ' sequence record'
+    if node.get_size() > 1:
+        html_string += 's'
+    if node.get_size() > 0:
+        per_pop_sizes = node.get_per_pop_sizes()
+        html_string += ' ('
+        pops_string = ''
+        for x in range(len(pops)):
+            if per_pop_sizes[x] > 0:
+                pops_string += str(per_pop_sizes[x]) + ' x ' + pops[x] + ', '
+        pops_string = pops_string[:-2]
+        html_string += pops_string
+        html_string += ')'
+    html_string += '</td>\n'
+    html_string += '                  </tr>\n'
+    html_string += '                  <tr class="spaceUnder">\n'
+    html_string += '                    <td valign="top" style="font-family:Courier">Sequence record'
+    if len(node.get_record_ids()) > 1:
+        html_string += 's'
+    html_string += ': </td>\n'
+    html_string += '                    <td style="font-family:Courier">\n'
+    if len(node.get_record_ids()) > 0:
+        record_ids_string = ''
+        for record_id in sorted(node.get_record_ids()):
+            record_ids_string += '                    ' + record_id + ',<br>\n'
+        record_ids_string = record_ids_string[:-6]
+        html_string += record_ids_string + '\n'
+    else:
+        html_string += '                      None'
+    html_string += '                    </td>\n'
+    html_string += '                  </tr>\n'
+    node_count += 1
+html_string += '                </table>\n'
+html_string += '              </div>\n'
+html_string += '            </span>\n'
+html_string += '          </td>\n'
+html_string += '        <tr>\n'
+
+# The nucleotide diversity section.
+html_string += '        <tr class="smallSpaceUnder">\n'
+html_string += '          <td style="font-size:30px; font-weight:bold">Nucleotide diversity</td>\n'
+html_string += '        </tr>\n'
+html_string += '        <tr class="largeSpaceUnder">\n'
+html_string += '          <td style="font-family:helvetica; font-size:12px">\n'
+html_string += '            <table width="840" border="0" cellpadding="0" cellspacing="1">\n'
+html_string += '              <tr>\n'
+html_string += '                <td width="168" style="font-weight:bold">Population</td>\n'
+html_string += '                <td width="168" style="font-weight:bold">Variable sites</td>\n'
+html_string += '                <td width="168" style="font-weight:bold">Invariable sites</td>\n'
+html_string += '                <td width="336" style="font-weight:bold">Proportion variable</td>\n'
+html_string += '              </tr>\n'
+html_string += '              <tr>\n'
+html_string += '                <td width="168" style="font-weight:bold">All</td>\n'
+html_string += '                <!-- Total variable: string start -->\n'
+html_string += '                <td width="168">' + str(align.get_number_of_variable_sites()) + '</td>\n'
+html_string += '                <!-- Total variable: string end -->\n'
+html_string += '                <td width="168">' + str(align.get_number_of_invariable_sites()) + '</td>\n'
+html_string += '                <!-- Proportion variable: string start -->\n'
+html_string += '                <td width="336">' + "{0:.4f}".format(align.get_proportion_of_variable_sites()) + '</td>\n'
+html_string += '                <!-- Proportion variable: string end -->\n'
+html_string += '              </tr>\n'
+if pops != None:
+    for pop in pops:
+        html_string += '              <tr>\n'
+        html_string += '                <td width="168" style="font-weight:bold">' + pop + '</td>\n'
+        html_string += '                <td width="168">' + str(align.get_number_of_variable_sites(pop)) + '</td>\n'
+        html_string += '                <td width="168">' + str(align.get_number_of_invariable_sites(pop)) + '</td>\n'
+        html_string += '                <td width="336">' + "{0:.4f}".format(align.get_proportion_of_variable_sites(pop)) + '</td>\n'
+        html_string += '              </tr>\n'
+html_string += '            </table>\n'
+html_string += '          </td>\n'
+html_string += '        </tr>\n'
+
+# The between population differentiation section.
+if pops != None and len(pops) > 1:
+    html_string += '        <tr class="smallSpaceUnder">\n'
+    html_string += '          <td style="font-size:30px; font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12796/abstract">Between-population differentiation</a></td>\n'
+    html_string += '        </tr>\n'
+    html_string += '        <tr class="largeSpaceUnder">\n'
+    html_string += '          <td style="font-family:helvetica; font-size:12px">\n'
+    html_string += '            <table width="840" border="0" cellpadding="0" cellspacing="1">\n'
+    html_string += '              <tr>\n'
+    html_string += '                <td width="168" style="font-weight:bold">Population 1</td>\n'
+    html_string += '                <td width="168" style="font-weight:bold">Population 2</td>\n'
+    html_string += '                <td width="168" style="font-weight:bold">F<sub>ST</sub></td>\n'
+    html_string += '                <td width="168" style="font-weight:bold">d<sub>XY</td>\n'
+    html_string += '                <td width="168" style="font-weight:bold">d<sub>a</td>\n'
+    html_string += '              </tr>\n'
+    for x in range(0,len(pops)-1):
+        for y in range(x+1,len(pops)):
+            html_string += '              <tr>\n'
+            html_string += '                <td width="168" style="font-weight:bold">' + pops[x] + '</td>\n'
+            html_string += '                <td width="168" style="font-weight:bold">' + pops[y] + '</td>\n'
+            f_st = align.get_F_st([pops[x], pops[y]])
+            if x == 0 and y == 1:
+                html_string += '                <!-- First f_st: string start -->\n'
+            if f_st == None:
+                html_string += '                <td>NA</td>\n'
+            else:
+                html_string += '                <td width="168">' + "{0:.4f}".format(f_st) + '</td>\n'
+            if x == 0 and y == 1:
+                html_string += '                <!-- First f_st: string end -->\n'
+            d_xy = align.get_d_xy([pops[x], pops[y]])
+            if x == 0 and y == 1:
+                html_string += '                <!-- First d_xy: string start -->\n'
+            if d_xy == None:
+                html_string += '                <td width="168">NA</td>\n'
+            else:
+                html_string += '                <td width="168">' + str(d_xy) + '</td>\n'
+            if x == 0 and y == 1:
+                html_string += '                <!-- First d_xy: string end -->\n'
+            d_a = align.get_d_a([pops[x], pops[y]])
+            if x == 0 and y == 1:
+                html_string += '                <!-- First d_a: string start -->\n'
+            if d_a == None:
+                html_string += '                <td width="168">NA</td>\n'
+            else:
+                html_string += '                <td width="168">' + str(d_a) + '</td>\n'
+            if x == 0 and y == 1:
+                html_string += '                <!-- First d_a: string end -->\n'
+            html_string += '              </tr>\n'
+    html_string += '            </table>\n'
+    html_string += '          </td>\n'
+    html_string += '        </tr>\n'
+
+# The genealogical sorting index section.
+if len(pops) > 0:
+    html_string += '        <tr class="smallSpaceUnder">\n'
+    html_string += '          <td style="font-size:30px; font-weight:bold"><a href="http://www.bioone.org/doi/abs/10.1111/j.1558-5646.2008.00442.x">Genealogical sorting index</a></td>\n'
+    html_string += '        </tr>\n'
+    html_string += '        <tr class="largeSpaceUnder">\n'
+    html_string += '          <td style="font-family:helvetica; font-size:12px">\n'
+    html_string += '            <table width="840" border="0" cellpadding="0" cellspacing="1">\n'
+    html_string += '              <tr>\n'
+    html_string += '                <td width="168" style="font-weight:bold">Population</td>\n'
+    html_string += '                <td width="672" style="font-weight:bold">gsi</td>\n'
+    html_string += '              </tr>\n'
+    for x in range(0,len(pops)):
+        html_string += '              <tr>\n'
+        html_string += '                <td width="168" style="font-weight:bold">' + pops[x] + '</td>\n'
+        if x == 0:
+            html_string += '                <!-- First gsi: string start -->\n'
+        elif x == 1:
+            html_string += '                <!-- Second gsi: string start -->\n'
+        if gsis[x] == None:
+            html_string += '                <td width="672">NA</td>\n'
+        else:
+            html_string += '                <td width="672">' + "{0:.4f}".format(gsis[x]) + '</td>\n'
+        if x == 0:
+            html_string += '                <!-- First gsi: string end -->\n'
+        elif x == 1:
+            html_string += '                <!-- Second gsi: string end -->\n'
+        html_string += '              </tr>\n'
+    html_string += '            </table>\n'
+    html_string += '          </td>\n'
+    html_string += '        </tr>\n'
+
+# Finalize the html string.
+html_string += '      </table>\n'
+html_string += '    </div>\n'
+html_string += '  </body>\n'
+html_string += '</html>\n'
+html_string += ''
+html_string += ''
+
+# Write the html string to STDOUT.
+outfile.write(html_string)
