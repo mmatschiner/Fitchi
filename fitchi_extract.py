@@ -26,7 +26,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
 	'-v', '--version',
 	action='version',
-	version='%(prog)s 0.95'
+	version='%(prog)s 0.96'
 	)
 parser.add_argument(
     '-e',
@@ -38,7 +38,7 @@ parser.add_argument(
     	Possible arguments are: svg, svg_simple, svg_bw, \
     	svg_simple_bw (the haplotype genealogy SVG code, see manual for \
     	details), prop_var (the proportion of variable sites in the alignments), \
-		tot_var (the total number of variable sites), fst, dxy, and da (see Cruickshank & Hahn 2014), \
+		tot_var (the total number of variable sites), fst, dxy, and df (see Ruegg et al. 2014), \
 		as well as the gsi of the first (gsi1) and second (gsi2) population."
     	)
 parser.add_argument(
@@ -241,6 +241,26 @@ elif extract == 'prop_var':
 			prop_var = float(prop_var_string.group(0)[1:-1])
 	outfile.write(str(prop_var) + '\n')
 
+# Find the probability pi that two randomly drawn individuals have different alleles.
+elif extract == 'pi':
+	lines = instring.split('\n')
+	pi_start_pattern = re.compile("<!-- Pi: string start -->")
+	pi_end_pattern = re.compile("<!-- Pi: string end -->")
+	in_pi_part = False
+	pi = None
+	for line in lines:
+		pi_hit_start = re.search(pi_start_pattern, line)
+		pi_hit_end = re.search(pi_end_pattern, line)
+		if pi_hit_start != None:
+			in_pi_part = True
+		elif pi_hit_end != None:
+			in_pi_part = False
+		elif in_pi_part == True:
+			pi_pattern = re.compile(">.+<")
+			pi_string = re.search(pi_pattern, line)
+			pi = float(pi_string.group(0)[1:-1])
+	outfile.write(str(pi) + '\n')
+
 # Find the first pairwise Fst value.
 elif extract == 'fst':
 	lines = instring.split('\n')
@@ -264,7 +284,7 @@ elif extract == 'fst':
 				fst = float(fst_string.group(0)[1:-1])
 	outfile.write(str(fst) + '\n')
 
-# Find the first d_xy value (see Cruickshank & Hahn 2014).
+# Find the first d_xy value (see Ruegg et al. 2014).
 elif extract == 'dxy':
 	lines = instring.split('\n')
 	dxy_start_pattern = re.compile("<!-- First d_xy: string start -->")
@@ -287,28 +307,28 @@ elif extract == 'dxy':
 				dxy = float(dxy_string.group(0)[1:-1])
 	outfile.write(str(dxy) + '\n')
 
-# Find the first d_a value (see Cruickshank & Hahn 2014).
-elif extract == 'da':
+# Find the first d_f value (see Ruegg et al. 2014).
+elif extract == 'df':
 	lines = instring.split('\n')
-	da_start_pattern = re.compile("<!-- First d_a: string start -->")
-	da_end_pattern = re.compile("<!-- First d_a: string end -->")
-	in_da_part = False
-	da = None
+	df_start_pattern = re.compile("<!-- First d_f: string start -->")
+	df_end_pattern = re.compile("<!-- First d_f: string end -->")
+	in_df_part = False
+	df = None
 	for line in lines:
-		da_hit_start = re.search(da_start_pattern, line)
-		da_hit_end = re.search(da_end_pattern, line)
-		if da_hit_start != None:
-			in_da_part = True
-		elif da_hit_end != None:
-			in_da_part = False
-		elif in_da_part == True:
-			da_pattern = re.compile(">.+<")
-			da_string = re.search(da_pattern, line)
-			if da_string.group(0)[1:-1] == 'NA':
-				da = 'NA'
+		df_hit_start = re.search(df_start_pattern, line)
+		df_hit_end = re.search(df_end_pattern, line)
+		if df_hit_start != None:
+			in_df_part = True
+		elif df_hit_end != None:
+			in_df_part = False
+		elif in_df_part == True:
+			df_pattern = re.compile(">.+<")
+			df_string = re.search(df_pattern, line)
+			if df_string.group(0)[1:-1] == 'NA':
+				df = 'NA'
 			else:
-				da = float(da_string.group(0)[1:-1])
-	outfile.write(str(da) + '\n')
+				df = float(df_string.group(0)[1:-1])
+	outfile.write(str(df) + '\n')
 
 # Find the first gsi value.
 elif extract == 'gsi1':

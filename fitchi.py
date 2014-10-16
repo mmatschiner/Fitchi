@@ -2100,7 +2100,7 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
 
     def get_d_f(self, pops=[]):
         if len(pops) != 2:
-            print("Exactly two populations must be specified to calculate pairwise d_xy!")
+            print("Exactly two populations must be specified to calculate pairwise d_f!")
             sys.exit(0)
         else:
             l_k = self.get_alignment_length()
@@ -2184,7 +2184,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 0.95')
+    version='%(prog)s 0.96')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
