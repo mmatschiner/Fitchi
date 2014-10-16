@@ -1888,48 +1888,58 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
             return allele_frequencies
 
     def get_is_biallelic_per_site(self, x, pops=[]):
-        allele_frequencies = [0, 0, 0, 0]
-        for pop in pops:
-            pop_allele_frequencies = self.get_allele_frequencies(x, [pop])
-            allele_frequencies[0] += pop_allele_frequencies[0]
-            allele_frequencies[1] += pop_allele_frequencies[1]
-            allele_frequencies[2] += pop_allele_frequencies[2]
-            allele_frequencies[3] += pop_allele_frequencies[3]
-        allele_frequency_zeros = 0
-        if allele_frequencies[0] == 0:
-            allele_frequency_zeros += 1
-        if allele_frequencies[1] == 0:
-            allele_frequency_zeros += 1
-        if allele_frequencies[2] == 0:
-            allele_frequency_zeros += 1
-        if allele_frequencies[3] == 0:
-            allele_frequency_zeros += 1
-        if allele_frequency_zeros == 2:
-            return True
+        if isinstance(pops, list) == False:
+            print("ERROR: Populations are not given as a list (get_is_biallelic_per_site):")
+            print(pops)
+            sys.exit(0)
         else:
-            return False
+            allele_frequencies = [0, 0, 0, 0]
+            for pop in pops:
+                pop_allele_frequencies = self.get_allele_frequencies(x, [pop])
+                allele_frequencies[0] += pop_allele_frequencies[0]
+                allele_frequencies[1] += pop_allele_frequencies[1]
+                allele_frequencies[2] += pop_allele_frequencies[2]
+                allele_frequencies[3] += pop_allele_frequencies[3]
+            allele_frequency_zeros = 0
+            if allele_frequencies[0] == 0:
+                allele_frequency_zeros += 1
+            if allele_frequencies[1] == 0:
+                allele_frequency_zeros += 1
+            if allele_frequencies[2] == 0:
+                allele_frequency_zeros += 1
+            if allele_frequencies[3] == 0:
+                allele_frequency_zeros += 1
+            if allele_frequency_zeros == 2:
+                return True
+            else:
+                return False
 
     def get_is_variable_per_site(self, x, pops=[]):
-        allele_frequencies = [0, 0, 0, 0]
-        for pop in pops:
-            pop_allele_frequencies = self.get_allele_frequencies(x, [pop])
-            allele_frequencies[0] += pop_allele_frequencies[0]
-            allele_frequencies[1] += pop_allele_frequencies[1]
-            allele_frequencies[2] += pop_allele_frequencies[2]
-            allele_frequencies[3] += pop_allele_frequencies[3]
-        allele_frequency_zeros = 0
-        if allele_frequencies[0] == 0:
-            allele_frequency_zeros += 1
-        if allele_frequencies[1] == 0:
-            allele_frequency_zeros += 1
-        if allele_frequencies[2] == 0:
-            allele_frequency_zeros += 1
-        if allele_frequencies[3] == 0:
-            allele_frequency_zeros += 1
-        if allele_frequency_zeros == 3:
-            return False
+        if isinstance(pops, list) == False:
+            print("ERROR: Populations are not given as a list (get_is_variable_per_site):")
+            print(pops)
+            sys.exit(0)
         else:
-            return True
+            allele_frequencies = [0, 0, 0, 0]
+            for pop in pops:
+                pop_allele_frequencies = self.get_allele_frequencies(x, [pop])
+                allele_frequencies[0] += pop_allele_frequencies[0]
+                allele_frequencies[1] += pop_allele_frequencies[1]
+                allele_frequencies[2] += pop_allele_frequencies[2]
+                allele_frequencies[3] += pop_allele_frequencies[3]
+            allele_frequency_zeros = 0
+            if allele_frequencies[0] == 0:
+                allele_frequency_zeros += 1
+            if allele_frequencies[1] == 0:
+                allele_frequency_zeros += 1
+            if allele_frequencies[2] == 0:
+                allele_frequency_zeros += 1
+            if allele_frequencies[3] == 0:
+                allele_frequency_zeros += 1
+            if allele_frequency_zeros == 3:
+                return False
+            else:
+                return True
 
     def get_pi_per_site(self, x, pops=[]):
         # pi is the probability that two randomly chosen sequences from the
@@ -2097,8 +2107,8 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
             number_of_fixed_snps = 0
             for x in range(self.get_alignment_length()):
                 if self.get_is_biallelic_per_site(x, pops):
-                    pop0_variable = self.get_is_variable_per_site(x, pops[0])
-                    pop1_variable = self.get_is_variable_per_site(x, pops[1])
+                    pop0_variable = self.get_is_variable_per_site(x, [pops[0]])
+                    pop1_variable = self.get_is_variable_per_site(x, [pops[1]])
                     if pop0_variable == False and pop1_variable == False:
                         number_of_fixed_snps += 1
             d_f = number_of_fixed_snps/l_k
@@ -2746,7 +2756,7 @@ if pops != None and len(pops) > 1:
     html_string += '                <td width="168" style="font-weight:bold">Population 2</td>\n'
     html_string += '                <td width="168" style="font-weight:bold">F<sub>ST</sub></td>\n'
     html_string += '                <td width="168" style="font-weight:bold">d<sub>XY</td>\n'
-    html_string += '                <td width="168" style="font-weight:bold">d<sub>a</td>\n'
+    html_string += '                <td width="168" style="font-weight:bold">d<sub>f</td>\n'
     html_string += '              </tr>\n'
     for x in range(0,len(pops)-1):
         for y in range(x+1,len(pops)):
