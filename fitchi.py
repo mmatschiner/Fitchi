@@ -1830,17 +1830,21 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
             # Count differences between other included seqs and the first seq.
             number_of_variable_sites = 0
             for x in range(0,self.get_alignment_length()):
+                site_is_variable = False
                 for y in range(1,len(self)):
-                    if pops == []:
-                        if self[y].seq[x] is not first_included_seq[x]:
-                            number_of_variable_sites += 1
-                            break
-                    else:
-                        for pop in pops:
-                            if pop in self[y].id:
-                                if self[y].seq[x] is not first_included_seq[x]:
-                                    number_of_variable_sites += 1
-                                    break
+                    if site_is_variable == False:
+                        if pops == []:
+                            if self[y].seq[x] is not first_included_seq[x]:
+                                site_is_variable = True
+                                break
+                        else:
+                            for pop in pops:
+                                if pop in self[y].id:
+                                    if self[y].seq[x] is not first_included_seq[x]:
+                                        site_is_variable = True
+                                        break
+                if site_is_variable == True:
+                    number_of_variable_sites += 1
             # Return.
             return number_of_variable_sites
 
@@ -1958,8 +1962,7 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
                 if all_allele_frequency is not 0:
                     two_allele_frequencies.append(all_allele_frequency)
             if len(two_allele_frequencies) == 0:
-                print("ERROR: No allele found!")
-                sys.exit(0)
+                return 0
             elif len(two_allele_frequencies) == 1:
                 return 0
             elif len(two_allele_frequencies) == 2:
@@ -1971,8 +1974,7 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
                 pi = numerator/denominator
                 return pi
             elif len(two_allele_frequencies) > 2:
-                print("ERROR: More than two alleles found!")
-                sys.exit(0)
+                return None
 
     def get_pi(self, pops=[]):
         pi_per_site_values = []
@@ -2069,32 +2071,33 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
                 if self.get_is_biallelic_per_site(x, pops):
                     all_allele_frequencies0 = self.get_allele_frequencies(x, [pops[0]])
                     all_allele_frequencies1 = self.get_allele_frequencies(x, [pops[1]])
-                    two_allele_frequencies0 = []
-                    two_allele_frequencies1 = []
-                    if all_allele_frequencies0[0] != 0 or all_allele_frequencies1[0] != 0:
-                        two_allele_frequencies0.append(all_allele_frequencies0[0])
-                        two_allele_frequencies1.append(all_allele_frequencies1[0])
-                    if all_allele_frequencies0[1] != 0 or all_allele_frequencies1[1] != 0:
-                        two_allele_frequencies0.append(all_allele_frequencies0[1])
-                        two_allele_frequencies1.append(all_allele_frequencies1[1])
-                    if all_allele_frequencies0[2] != 0 or all_allele_frequencies1[2] != 0:
-                        two_allele_frequencies0.append(all_allele_frequencies0[2])
-                        two_allele_frequencies1.append(all_allele_frequencies1[2])
-                    if all_allele_frequencies0[3] != 0 or all_allele_frequencies1[3] != 0:
-                        two_allele_frequencies0.append(all_allele_frequencies0[3])
-                        two_allele_frequencies1.append(all_allele_frequencies1[3])
-                    if len(two_allele_frequencies0) != 2:
-                        print("ERROR: Wrong number of allele frequencies!")
-                        print(all_allele_frequencies0)
-                        print(all_allele_frequencies1)
-                        sys.exit(0)
-                    r0 = two_allele_frequencies0[0]
-                    a0 = two_allele_frequencies0[1]
-                    r1 = two_allele_frequencies1[0]
-                    a1 = two_allele_frequencies1[1]
-                    numerator = r0*a1 + r1*a0
-                    denominator = (r0+a0) * (r1+a1)
-                    sum_of_quotients += numerator/denominator
+                    if sum(all_allele_frequencies0) > 0 and sum(all_allele_frequencies1) > 0:
+                        two_allele_frequencies0 = []
+                        two_allele_frequencies1 = []
+                        if all_allele_frequencies0[0] != 0 or all_allele_frequencies1[0] != 0:
+                            two_allele_frequencies0.append(all_allele_frequencies0[0])
+                            two_allele_frequencies1.append(all_allele_frequencies1[0])
+                        if all_allele_frequencies0[1] != 0 or all_allele_frequencies1[1] != 0:
+                            two_allele_frequencies0.append(all_allele_frequencies0[1])
+                            two_allele_frequencies1.append(all_allele_frequencies1[1])
+                        if all_allele_frequencies0[2] != 0 or all_allele_frequencies1[2] != 0:
+                            two_allele_frequencies0.append(all_allele_frequencies0[2])
+                            two_allele_frequencies1.append(all_allele_frequencies1[2])
+                        if all_allele_frequencies0[3] != 0 or all_allele_frequencies1[3] != 0:
+                            two_allele_frequencies0.append(all_allele_frequencies0[3])
+                            two_allele_frequencies1.append(all_allele_frequencies1[3])
+                        if len(two_allele_frequencies0) != 2:
+                            print("ERROR: Wrong number of allele frequencies!")
+                            print(all_allele_frequencies0)
+                            print(all_allele_frequencies1)
+                            sys.exit(0)
+                        r0 = two_allele_frequencies0[0]
+                        a0 = two_allele_frequencies0[1]
+                        r1 = two_allele_frequencies1[0]
+                        a1 = two_allele_frequencies1[1]
+                        numerator = r0*a1 + r1*a0
+                        denominator = (r0+a0) * (r1+a1)
+                        sum_of_quotients += numerator/denominator
             d_xy = sum_of_quotients/l_k
             return d_xy
 
@@ -2184,7 +2187,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 0.96')
+    version='%(prog)s 0.97')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
@@ -2309,7 +2312,7 @@ if inlines[0][0] == '#':
             in_matrix = False
             in_tree = False
         elif in_matrix and line.strip() is not '':
-            seq_string = line.split()[1]
+            seq_string = line.split()[1].upper()
             if window_end_pos == -1:
                 seq_string = seq_string[window_start_pos:]
             else:

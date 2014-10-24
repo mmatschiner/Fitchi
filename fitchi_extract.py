@@ -38,8 +38,9 @@ parser.add_argument(
     	Possible arguments are: svg, svg_simple, svg_bw, \
     	svg_simple_bw (the haplotype genealogy SVG code, see manual for \
     	details), prop_var (the proportion of variable sites in the alignments), \
-		tot_var (the total number of variable sites), fst, dxy, and df (see Ruegg et al. 2014), \
-		as well as the gsi of the first (gsi1) and second (gsi2) population."
+		tot_var (the total number of variable sites), fst, dxy, and df (each for \
+		the first pairwise comparison), as well as the gsi of the first (gsi1) \
+		and second (gsi2) population."
     	)
 parser.add_argument(
 	'infile',
