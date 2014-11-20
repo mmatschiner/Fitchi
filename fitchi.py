@@ -2291,9 +2291,16 @@ elif len(pops) == 6:
 elif len(pops) == 7:
     # red, cyan, violet, yellow, green, magenta, blue
     colors = ['dc322f', '2aa198', '6c71c4', 'b58900', '859900', 'd33682', '268bd2']
-elif len(pops) > 7:
+elif len(pops) == 8:
     # yellow, green, cyan, blue, violet, magenta, red, orange
     colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16']
+elif len(pops) == 9:
+    # yellow, green, cyan, blue, violet, magenta, red, orange, base02
+    colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16', '073642']
+elif len(pops) > 9:
+    # yellow, green, cyan, blue, violet, magenta, red, orange, base02, base01
+    colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16', '073642', '586e75']
+# 93a1a1
 rest_color = '93a1a1'
 
 # Parse the input.
