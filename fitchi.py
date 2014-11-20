@@ -619,6 +619,22 @@ class Tree(object):
             edge.set_unit_delta_x(unit_delta_x)
             edge.set_unit_delta_y(unit_delta_y)
 
+        # Get the sum of all fitch distances.
+        sum_of_fitch_distances = 0
+        for edge in self.edges:
+            sum_of_fitch_distances += edge.get_fitch_distance()
+
+        # Get the sum of all node sizes.
+        sum_of_node_sizes = 0
+        for node in self.nodes:
+            sum_of_node_sizes += node.get_size()
+
+        # Determine the scale factor of node size and edge length.
+        if sum_of_fitch_distances == 0:
+            scale_factor = 1
+        else:
+            scale_factor = math.sqrt(sum_of_node_sizes/sum_of_fitch_distances)
+
         # Set the position of the root node to 0,0.
         root_found = False
         for node in self.nodes:
@@ -660,7 +676,7 @@ class Tree(object):
                             break
                     if connecting_edge_found == False:
                         print('WARNING: An edge was not found!')
-                    connecting_edge_length = connecting_edge.get_fitch_distance()
+                    connecting_edge_length = connecting_edge.get_fitch_distance() * scale_factor
                     total_edge_length = node_radius + parent_radius + connecting_edge_length
                     total_delta_x = total_edge_length * connecting_edge.get_unit_delta_x()
                     total_delta_y = total_edge_length * connecting_edge.get_unit_delta_y()
