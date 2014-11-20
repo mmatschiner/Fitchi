@@ -1812,41 +1812,25 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
             return unique_map
 
     def get_number_of_variable_sites(self, pops=[]):
-        # Find the first sequence of this population.
-        first_included_seq = None
-        record_index = -1
-        while first_included_seq == None and record_index < len(self)-1:
-            record_index += 1
+        # Get all sequences of this population.
+        seqs = []
+        for y in range(1,len(self)):
             if pops == []:
-                first_included_seq = self[record_index].seq
+                seqs.append(str(self[y].seq))
             else:
                 for pop in pops:
-                    if pop in self[record_index].id:
-                        first_included_seq = self[record_index].seq
+                    if pop in self[y].id:
+                        seqs.append(str(self[y].seq[0]))
                         break
-        if first_included_seq == None:
-            return 0
-        else:
-            # Count differences between other included seqs and the first seq.
-            number_of_variable_sites = 0
-            for x in range(0,self.get_alignment_length()):
-                site_is_variable = False
-                for y in range(1,len(self)):
-                    if site_is_variable == False:
-                        if pops == []:
-                            if self[y].seq[x] is not first_included_seq[x]:
-                                site_is_variable = True
-                                break
-                        else:
-                            for pop in pops:
-                                if pop in self[y].id:
-                                    if self[y].seq[x] is not first_included_seq[x]:
-                                        site_is_variable = True
-                                        break
-                if site_is_variable == True:
-                    number_of_variable_sites += 1
-            # Return.
-            return number_of_variable_sites
+        number_of_variable_sites = 0
+        for x in range(0,self.get_alignment_length()):
+            bases = []
+            for y in range(1,len(seqs)):
+                if seqs[y][x] in ['a','A','c','C','g','G','t','T']:
+                    bases.append(seqs[y][x])
+            if len(set(bases)) > 1:
+                number_of_variable_sites += 1
+        return number_of_variable_sites
 
     def get_number_of_unique_genotypes(self, pop=None):
         seqs = []
