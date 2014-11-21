@@ -1830,18 +1830,18 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
     def get_number_of_variable_sites(self, pops=[]):
         # Get all sequences of this population.
         seqs = []
-        for y in range(1,len(self)):
+        for y in range(0,len(self)):
             if pops == []:
                 seqs.append(str(self[y].seq))
             else:
                 for pop in pops:
                     if pop in self[y].id:
-                        seqs.append(str(self[y].seq[0]))
+                        seqs.append(str(self[y].seq))
                         break
         number_of_variable_sites = 0
         for x in range(0,self.get_alignment_length()):
             bases = []
-            for y in range(1,len(seqs)):
+            for y in range(0,len(seqs)):
                 if seqs[y][x] in ['a','A','c','C','g','G','t','T']:
                     bases.append(seqs[y][x])
             if len(set(bases)) > 1:
