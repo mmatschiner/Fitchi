@@ -633,7 +633,7 @@ class Tree(object):
         if sum_of_fitch_distances == 0:
             scale_factor = 1
         else:
-            scale_factor = math.sqrt(sum_of_node_sizes/sum_of_fitch_distances)
+            scale_factor = sum_of_node_sizes/(2*sum_of_fitch_distances)
 
         # Set the position of the root node to 0,0.
         root_found = False
@@ -998,7 +998,7 @@ class Tree(object):
                             old_p = new_p
                         elif proportion == 1.0:
                             svg_string += '  <circle fill=\"#'
-                            if colors[s] == None:
+                            if s > len(colors)-1:
                                 svg_string += rest_color
                             else:
                                 svg_string += colors[s]
@@ -2295,12 +2295,12 @@ elif len(pops) == 8:
     # yellow, green, cyan, blue, violet, magenta, red, orange
     colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16']
 elif len(pops) == 9:
-    # yellow, green, cyan, blue, violet, magenta, red, orange, base02
-    colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16', '073642']
+    # yellow, green, cyan, blue, violet, magenta, red, orange, base03
+    colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16', '002b36']
 elif len(pops) > 9:
-    # yellow, green, cyan, blue, violet, magenta, red, orange, base02, base01
-    colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16', '073642', '586e75']
-# 93a1a1
+    # yellow, green, cyan, blue, violet, magenta, red, orange, base03, base01
+    colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16', '002b36', '586e75']
+# base1
 rest_color = '93a1a1'
 
 # Parse the input.
