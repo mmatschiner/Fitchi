@@ -17,6 +17,7 @@ import re
 import networkx as nx
 import math
 import scipy
+import pygraphviz
 from scipy import special
 from subprocess import call
 from Bio.Seq import Seq
@@ -2183,11 +2184,12 @@ parser = argparse.ArgumentParser(
     -----------------------------------------
       Reads nexus formatted strings and produces
       haplotype genealogies using the Fitch algorithm.
+      www.evoinformatics.eu/fitchi.htm
     '''))
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 0.97')
+    version='%(prog)s 0.98')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
@@ -2263,6 +2265,7 @@ elif window_end_pos != -1:
 pops = args.populations
 if infile.isatty():
     print("No input file specified, and no input piped through stdin!")
+    print("Use '-h' to see available options.")
     sys.exit(0)
 
 # Define a color scheme.
