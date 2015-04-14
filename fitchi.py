@@ -1,13 +1,13 @@
 #!/usr/local/bin/python3
 
-# Michael Matschiner, 2014-10-14
+# Michael Matschiner, 2015-04-15
 # michaelmatschiner@mac.com
 
 # Import libraries and make sure we're on python 3.
 import sys
 if sys.version_info[0] < 3:
-    print('Python 3 is needed to run this script!')
-    sys.exit(0)
+    print('ERROR: Python 3 is needed to run this script!')
+    sys.exit(1)
 import argparse
 import textwrap
 import random
@@ -147,7 +147,7 @@ class Tree(object):
         else:
             print(self.newick_string)
             print('ERROR: The newick tree string could not be parsed!')
-            sys.exit(0)
+            sys.exit(1)
 
         # Add info about children to each node.
         count = 0
@@ -1582,8 +1582,8 @@ class XSeq(Seq):
     def get_distance_to(self, seq, transversions_only):
         distance = 0
         if len(self) != len(seq):
-            print("Both sequences must be of the same length!")
-            sys.exit(0)
+            print("ERROR: Both sequences must be of the same length!")
+            sys.exit(1)
         for x in range(0,len(self)):
             if transversions_only:
                 if self[x] in ['A', 'G', 'R']:
@@ -1866,7 +1866,7 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
         if isinstance(pops, list) == False:
             print("ERROR: Populations are not given as a list (get_allele_frequencies):")
             print(pops)
-            sys.exit(0)
+            sys.exit(1)
         else:
             allele_frequencies = [0, 0, 0, 0]
             for y in range(0,len(self)):
@@ -1896,7 +1896,7 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
         if isinstance(pops, list) == False:
             print("ERROR: Populations are not given as a list (get_is_biallelic_per_site):")
             print(pops)
-            sys.exit(0)
+            sys.exit(1)
         else:
             allele_frequencies = [0, 0, 0, 0]
             for pop in pops:
@@ -1923,7 +1923,7 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
         if isinstance(pops, list) == False:
             print("ERROR: Populations are not given as a list (get_is_variable_per_site):")
             print(pops)
-            sys.exit(0)
+            sys.exit(1)
         else:
             allele_frequencies = [0, 0, 0, 0]
             for pop in pops:
@@ -1955,7 +1955,7 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
         if isinstance(pops, list) == False:
             print("ERROR: Populations are not given as a list (get_pi_per_site):")
             print(pops)
-            sys.exit(0)
+            sys.exit(1)
         else:
             all_allele_frequencies = self.get_allele_frequencies(x, pops)
             two_allele_frequencies = []
@@ -1993,9 +1993,12 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
         # Following Ruegg et al. (2014, Mol Ecol, A role for migration-linked genes and genomic
         # islands in divergence of a songbird) in using the equation of Hohenlohe et al. (2010)
         # for per snp calculation of F_st.
+        # Only biallelic SNPs are used for F_st calculation to avoid underestimation of dif-
+        # ferentiation with multi-allelic SNPs (see Jost 2008, Mol Ecol, Gst and its relatives
+        # do not measure differentiation).
         if len(pops) != 2:
-            print("Exactly two populations must be specified to calculate pairwise F_st!")
-            sys.exit(0)
+            print("ERROR: Exactly two populations must be specified to calculate pairwise F_st!")
+            sys.exit(1)
         else:
             if self.get_is_biallelic_per_site(x, pops):
                 pop0_allele_frequencies_sum = sum(self.get_allele_frequencies(x, [pops[0]]))
@@ -2009,7 +2012,7 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
                 denominator = pi_per_site01 * (binomial_coefficient0+binomial_coefficient1)
                 if denominator == 0:
                     print("ERROR: Attempt to divide by zero!")
-                    sys.exit(0)
+                    sys.exit(1)
                 f_st_per_site = 1 - (numerator / denominator)
                 return f_st_per_site
             else:
@@ -2017,8 +2020,8 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
 
     def get_F_st(self, pops=[]):
         if len(pops) != 2:
-            print("Exactly two populations must be specified to calculate pairwise F_st!")
-            sys.exit(0)
+            print("ERROR: Exactly two populations must be specified to calculate pairwise F_st!")
+            sys.exit(1)
         else:
             f_st_per_site_values = []
             for x in range(self.get_alignment_length()):
@@ -2030,41 +2033,11 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
             else:
                 return sum(f_st_per_site_values)/len(f_st_per_site_values)
 
-            # pop0_seqs = []
-            # pop1_seqs = []
-            # for y in range(0,len(self)):
-            #     if pops[0] in self[y].id:
-            #         pop0_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
-            #     elif pops[1] in self[y].id:
-            #         pop1_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
-            # if len(pop0_seqs) < 2:
-            #     return None
-            # elif len(pop1_seqs) < 2:
-            #     return None
-            # else:
-            #     within_variations = []
-            #     for x in range(0,len(pop0_seqs)-1):
-            #         for y in range(x+1,len(pop0_seqs)):
-            #             within_variations.append(pop0_seqs[x].get_distance_to(pop0_seqs[y], False))
-            #     for x in range(0,len(pop1_seqs)-1):
-            #         for y in range(x+1,len(pop1_seqs)):
-            #             within_variations.append(pop1_seqs[x].get_distance_to(pop1_seqs[y], False))
-            #     between_variations = []
-            #     for x in range(0,len(pop0_seqs)-1):
-            #         for y in range(0,len(pop1_seqs)):
-            #             between_variations.append(pop0_seqs[x].get_distance_to(pop1_seqs[y], False))
-            #     mean_between_variation = sum(between_variations)/len(between_variations)
-            #     mean_within_variation = sum(within_variations)/len(within_variations)
-            # if mean_between_variation == 0:
-            #     return None
-            # else:
-            #     return (mean_between_variation-mean_within_variation)/mean_between_variation
-
 
     def get_d_xy(self, pops=[]):
         if len(pops) != 2:
-            print("Exactly two populations must be specified to calculate pairwise d_xy!")
-            sys.exit(0)
+            print("ERROR: Exactly two populations must be specified to calculate pairwise d_xy!")
+            sys.exit(1)
         else:
             l_k = self.get_alignment_length()
             sum_of_quotients = 0
@@ -2091,7 +2064,7 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
                             print("ERROR: Wrong number of allele frequencies!")
                             print(all_allele_frequencies0)
                             print(all_allele_frequencies1)
-                            sys.exit(0)
+                            sys.exit(1)
                         r0 = two_allele_frequencies0[0]
                         a0 = two_allele_frequencies0[1]
                         r1 = two_allele_frequencies1[0]
@@ -2104,8 +2077,8 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
 
     def get_d_f(self, pops=[]):
         if len(pops) != 2:
-            print("Exactly two populations must be specified to calculate pairwise d_f!")
-            sys.exit(0)
+            print("ERROR: Exactly two populations must be specified to calculate pairwise d_f!")
+            sys.exit(1)
         else:
             l_k = self.get_alignment_length()
             number_of_fixed_snps = 0
@@ -2139,8 +2112,8 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
 
     # def get_d_a(self, pops=[]):
     #     if len(pops) != 2:
-    #         print("Exactly two populations must be specified to calculate pairwise d_a!")
-    #         sys.exit(0)
+    #         print("ERROR: Exactly two populations must be specified to calculate pairwise d_a!")
+    #         sys.exit(1)
     #     else:
     #         pop0_seqs = []
     #         pop1_seqs = []
@@ -2184,12 +2157,14 @@ parser = argparse.ArgumentParser(
     -----------------------------------------
       Reads nexus formatted strings and produces
       haplotype genealogies using the Fitch algorithm.
-      www.evoinformatics.eu/fitchi.htm
+      Start e.g. with
+      fitchi.py example.nex example.html -p pop3 pop5
+      Info: www.evoinformatics.eu/fitchi.htm
     '''))
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 0.98')
+    version='%(prog)s 0.981')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
@@ -2227,12 +2202,19 @@ parser.add_argument(
     dest='min_node_size',
     help="Minimum node size for display in haplotype genealogy"
     )
-
 parser.add_argument(
     '-x', '--transversions-only',
     action='store_true',
     dest='transversions_only',
     help="Ignore transitions and show transversions only"
+    )
+parser.add_argument(
+    '-s', '--seed',
+    nargs=1,
+    type=int,
+    default=[-1],
+    dest='seed',
+    help="random number seed"
     )
 parser.add_argument(
     'infile',
@@ -2252,21 +2234,26 @@ window_start_pos = args.start[0]-1
 window_end_pos = args.end[-1]
 minimum_edge_length = args.min_edge_length[0]
 minimum_node_size = args.min_node_size[0]
+seed = args.seed[0]
 transversions_only = args.transversions_only
+
+# Initialize the random number generator if a seed value has been provided.
+if seed != -1:
+    random.seed(seed)
 
 # Make sure sensible values are specified for the window start and end.
 if window_start_pos < 0:
-    print("The start position of the analysis window must be at least 1!")
-    sys.exit(0)
+    print("ERROR: The start position of the analysis window must be at least 1!")
+    sys.exit(1)
 elif window_end_pos != -1:
     if window_end_pos <= window_start_pos:
-        print("The end position of the analysis window must be greater than the start position!")
-        sys.exit(0)
+        print("ERROR: The end position of the analysis window must be greater than the start position!")
+        sys.exit(1)
 pops = args.populations
 if infile.isatty():
     print("No input file specified, and no input piped through stdin!")
     print("Use '-h' to see available options.")
-    sys.exit(0)
+    sys.exit(1)
 
 # Define a color scheme.
 # Colors use the Solarized color scheme of http://ethanschoonover.com/solarized.
@@ -2349,8 +2336,8 @@ elif inlines[0][0] == "(":
     tree_string = tree_patterns.group(0)
     tree = Tree(tree_string)
 else:
-    print("Unexpected file format!")
-    sys.exit(0)
+    print("ERROR: Unexpected file format!")
+    sys.exit(1)
 
 # Parse the newick tree string.
 tree.parse_newick_string(pops)
@@ -2372,7 +2359,7 @@ for node in nodes:
             print("ERROR: No sequence was found for node " + node_id + "!")
             all_seqs_found = False
 if all_seqs_found == False:
-    sys.exit(0)
+    sys.exit(1)
 
 # Reconstruct ancestral sequences using the Fitch algorithm.
 tree.reconstruct_ancestral_sequences()
