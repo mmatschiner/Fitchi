@@ -1814,6 +1814,12 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
                 number_of_records_for_this_pop += 1
         return number_of_records_for_this_pop
 
+    def set_is_haploid(self, haploid):
+        self.is_haploid = haploid
+
+    def get_is_haploid(self):
+        return self.is_haploid
+
     def all_records_map_uniquely_to_pops(self, pops=None):
         if pops == None:
             return False
@@ -1946,6 +1952,22 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
             else:
                 return True
 
+    def get_alleles_per_site(self, x, pops=[]):
+        if isinstance(pops, list) == False:
+            print("ERROR: Populations are not given as a list (get_alleles_per_site):")
+            print(pops)
+            sys.exit(1)
+        else:
+            alleles = []
+            for y in range(0,len(self)):
+                if pops == []:
+                    alleles << self[y].seq[x]
+                else:
+                    for pop in pops:
+                        if pop in self[y].id:
+                            alleles.append(self[y].seq[x])
+            return alleles
+
     def get_pi_per_site(self, x, pops=[]):
         # pi is the probability that two randomly chosen sequences from the
         # sample have different alleles at a site x.
@@ -1989,50 +2011,145 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
         else:
             return sum(pi_per_site_values)/l_k
 
-    def get_F_st_per_site(self, x, pops=[]):
-        # Following Ruegg et al. (2014, Mol Ecol, A role for migration-linked genes and genomic
-        # islands in divergence of a songbird) in using the equation of Hohenlohe et al. (2010)
-        # for per snp calculation of F_st.
-        # Only biallelic SNPs are used for F_st calculation to avoid underestimation of dif-
-        # ferentiation with multi-allelic SNPs (see Jost 2008, Mol Ecol, Gst and its relatives
-        # do not measure differentiation).
-        if len(pops) != 2:
-            print("ERROR: Exactly two populations must be specified to calculate pairwise F_st!")
-            sys.exit(1)
-        else:
-            if self.get_is_biallelic_per_site(x, pops):
-                pop0_allele_frequencies_sum = sum(self.get_allele_frequencies(x, [pops[0]]))
-                pop1_allele_frequencies_sum = sum(self.get_allele_frequencies(x, [pops[1]]))
-                binomial_coefficient0 = scipy.special.binom(pop0_allele_frequencies_sum,2)
-                binomial_coefficient1 = scipy.special.binom(pop1_allele_frequencies_sum,2)
-                pi_per_site0 = self.get_pi_per_site(x, [pops[0]])
-                pi_per_site1 = self.get_pi_per_site(x, [pops[1]])
-                pi_per_site01 = self.get_pi_per_site(x, pops)
-                numerator = pi_per_site0*binomial_coefficient0 + pi_per_site1*binomial_coefficient1
-                denominator = pi_per_site01 * (binomial_coefficient0+binomial_coefficient1)
-                if denominator == 0:
-                    print("ERROR: Attempt to divide by zero!")
-                    sys.exit(1)
-                f_st_per_site = 1 - (numerator / denominator)
-                return f_st_per_site
-            else:
-                return None
-
     def get_F_st(self, pops=[]):
         if len(pops) != 2:
             print("ERROR: Exactly two populations must be specified to calculate pairwise F_st!")
             sys.exit(1)
         else:
-            f_st_per_site_values = []
-            for x in range(self.get_alignment_length()):
-                f_st_per_site = self.get_F_st_per_site(x, pops)
-                if f_st_per_site is not None:
-                    f_st_per_site_values.append(f_st_per_site)
-            if f_st_per_site_values == []:
-                return None
-            else:
-                return sum(f_st_per_site_values)/len(f_st_per_site_values)
+            # Initiate six lists that will be needed for Fst calculation.
+            # ninds_dup_1 and ninds_dup_2 and the numbers of individuals for pop1 and pop2, per locus.
+            ninds_dup_1 = []
+            ninds_dup_2 = []
+            # p1 and p2 are the frequencies of allele A for pop1 and pop2, per locus.
+            p1 = []
+            p2 = []
+            # oh1 and oh2 are the frequencies of heterozygotes for pop1 and pop2, per locus.
+            oh1 = []
+            oh2 = []
 
+            # The number of populations, r is set to two.
+            r = 2
+
+            # Consider only biallelic loci, and only individuals without missing data.
+            for x in range(self.get_alignment_length()):
+                if self.get_is_biallelic_per_site(x, pops):
+
+                    # Get all alleles at this site.
+                    alleles_pop1 = self.get_alleles_per_site(x, [pops[0]])
+                    alleles_pop2 = self.get_alleles_per_site(x, [pops[1]])
+                    alleles_both_pops = alleles_pop1 + alleles_pop2
+                    unique_alleles_both_pops = sorted(list(set(alleles_both_pops)))
+                    good_unique_alleles_both_pops = []
+                    for unique_allele_both_pops in unique_alleles_both_pops:
+                        if unique_allele_both_pops in ["A", "C", "G", "T"]:
+                            good_unique_alleles_both_pops.append(unique_allele_both_pops)
+
+                    # If sequences are haploid, 'diploidize' them by counting each twice.
+                    if self.get_is_haploid() == True:
+                        tmp = []
+                        for allele in alleles_pop1:
+                            tmp.append(allele)
+                            tmp.append(allele)
+                        alleles_pop1 = tmp
+                        tmp = []
+                        for allele in alleles_pop2:
+                            tmp.append(allele)
+                            tmp.append(allele)
+                        alleles_pop2 = tmp
+
+                    # Get the good (= no missing data) pairs of alleles for both pops, for this site.
+                    good_pairs_of_alleles_pop1 = []
+                    good_pairs_of_alleles_pop2 = []
+                    for z in range(int(len(alleles_pop1)/2)):
+                        if alleles_pop1[z*2] in good_unique_alleles_both_pops and alleles_pop1[(z*2)+1] in good_unique_alleles_both_pops:
+                            good_pairs_of_alleles_pop1.append([alleles_pop1[z*2],alleles_pop1[(z*2)+1]])
+                    for z in range(int(len(alleles_pop2)/2)):
+                        if alleles_pop2[z*2] in good_unique_alleles_both_pops and alleles_pop2[(z*2)+1] in good_unique_alleles_both_pops:
+                            good_pairs_of_alleles_pop2.append([alleles_pop2[z*2],alleles_pop2[(z*2)+1]])
+
+                    # Get the number of good individuals in both pops based on the number of good pairs of alleles, for this site.
+                    ninds_dup_1_this_site = len(good_pairs_of_alleles_pop1)
+                    ninds_dup_2_this_site = len(good_pairs_of_alleles_pop2)
+
+                    # Get the frequencies of the two alleles, for this site.
+                    allele_A_occurrences_pop1 = 0
+                    allele_A_occurrences_pop2 = 0
+                    for good_pair_of_alleles_pop1 in good_pairs_of_alleles_pop1:
+                        for good_allele_pop1 in good_pair_of_alleles_pop1:
+                            if good_allele_pop1 == unique_alleles_both_pops[0]:
+                                allele_A_occurrences_pop1 += 1
+                            elif good_allele_pop1 != unique_alleles_both_pops[1]:
+                                print("ERROR: Unexpected allele found at site " + x + ": " + good_allele_pop1 + "!")
+                                sys.exit(1)
+                    for good_pair_of_alleles_pop2 in good_pairs_of_alleles_pop2:
+                        for good_allele_pop2 in good_pair_of_alleles_pop2:
+                            if good_allele_pop2 == unique_alleles_both_pops[0]:
+                                allele_A_occurrences_pop2 += 1
+                            elif good_allele_pop2 != unique_alleles_both_pops[1]:
+                                print("ERROR: Unexpected allele found at site " + x + ": " + good_allele_pop2 + "!")
+                                sys.exit(1)
+                    p1_this_site = allele_A_occurrences_pop1/(len(good_pairs_of_alleles_pop1)*2)
+                    p2_this_site = allele_A_occurrences_pop2/(len(good_pairs_of_alleles_pop2)*2)
+
+                    # Get the frequencies of heterozygotes, for this site.
+                    heterozygote_occurrences_pop1 = 0
+                    heterozygote_occurrences_pop2 = 0
+                    for good_pair_of_alleles_pop1 in good_pairs_of_alleles_pop1:
+                        if good_pair_of_alleles_pop1[0] != good_pair_of_alleles_pop1[1]:
+                            heterozygote_occurrences_pop1 += 1
+                    for good_pair_of_alleles_pop2 in good_pairs_of_alleles_pop2:
+                        if good_pair_of_alleles_pop2[0] != good_pair_of_alleles_pop2[1]:
+                            heterozygote_occurrences_pop2 += 1
+                    oh1_this_site = heterozygote_occurrences_pop1/len(good_pairs_of_alleles_pop1)
+                    oh2_this_site = heterozygote_occurrences_pop2/len(good_pairs_of_alleles_pop2)
+
+                    ninds_dup_1.append(ninds_dup_1_this_site)
+                    ninds_dup_2.append(ninds_dup_2_this_site)
+                    p1.append(p1_this_site)
+                    p2.append(p2_this_site)
+                    oh1.append(oh1_this_site)
+                    oh2.append(oh2_this_site)
+
+            # Calculation of Fst according to Weir & Cockerham (1984), as in method stamppFst of R package StAMPP.
+            # n_bar is the average number of individuals in a population, for each locus.
+            n_bar = []
+            for x in range(len(ninds_dup_1)):
+                n_bar.append((ninds_dup_1[x] + ninds_dup_2[x])/r)
+            nc = []
+            for x in range(len(ninds_dup_1)):
+                nc.append((r * n_bar[x]) - (((ninds_dup_1[x]**2) + (ninds_dup_2[x]**2))/(r * n_bar[x])))
+            # p_bar is the average sample frequency of allele A in a population, for each locus.
+            p_bar = []
+            for x in range(len(ninds_dup_1)):
+                p_bar.append(((ninds_dup_1[x] * p1[x])/(r * n_bar[x])) + ((ninds_dup_2[x] * p2[x])/(r * n_bar[x])))
+            # s_square is the sample variance of allele A frequencies over populations.
+            s_square = []
+            for x in range(len(ninds_dup_1)):
+                s_square.append(((ninds_dup_1[x] * ((p1[x] - p_bar[x])**2))/n_bar[x]) + ((ninds_dup_2[x] * ((p2[x] - p_bar[x])**2))/n_bar[x]))
+            # h_bar is the average heterozygote frequency for allele A.
+            h_bar = []
+            for x in range(len(ninds_dup_1)):
+                h_bar.append(((ninds_dup_1[x] * oh1[x])/(r * n_bar[x])) + ((ninds_dup_2[x] * oh2[x])/(r * n_bar[x])))
+            # Equation 2 in WC84.
+            a = []
+            for x in range(len(ninds_dup_1)):
+                a_cand = (n_bar[x]/nc[x]) * (s_square[x] - (1/(n_bar[x] - 1)) * ((p_bar[x] * (1 - p_bar[x])) - (((r - 1)/r) * s_square[x]) - ((1/4) * h_bar[x])))
+                if not math.isnan(a_cand):
+                    a.append(a_cand)
+            # Equation 3 in WC84.
+            b = []
+            for x in range(len(ninds_dup_1)):
+                b_cand = (n_bar[x]/(n_bar[x] - 1)) * ((p_bar[x] * (1 - p_bar[x])) - (((r - 1)/r) * s_square[x]) - (((2 * n_bar[x] - 1)/(4 * n_bar[x])) * h_bar[x]))
+                if not math.isnan(b_cand):
+                    b.append(b_cand)
+            # Equation 4 in WC84.
+            c = []
+            for x in range(len(ninds_dup_1)):
+                c_cand = (1/2) * h_bar[x]
+                if not math.isnan(c_cand):
+                    c.append(c_cand)
+            fst = sum(a)/(sum(a) + sum(b) + sum(c))
+            return fst
 
     def get_d_xy(self, pops=[]):
         if len(pops) != 2:
@@ -2091,63 +2208,6 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
             d_f = number_of_fixed_snps/l_k
             return d_f
 
-            # pop0_seqs = []
-            # pop1_seqs = []
-            # for y in range(0,len(self)):
-            #     if pops[0] in self[y].id:
-            #         pop0_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
-            #     elif pops[1] in self[y].id:
-            #         pop1_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
-            # if len(pop0_seqs) < 2:
-            #     return None
-            # elif len(pop1_seqs) < 2:
-            #     return None
-            # else:
-            #     between_variations = []
-            #     for x in range(0,len(pop0_seqs)-1):
-            #         for y in range(0,len(pop1_seqs)):
-            #             between_variations.append(pop0_seqs[x].get_distance_to(pop1_seqs[y], False))
-            #     d_xy = sum(between_variations)
-            #     return d_xy
-
-    # def get_d_a(self, pops=[]):
-    #     if len(pops) != 2:
-    #         print("ERROR: Exactly two populations must be specified to calculate pairwise d_a!")
-    #         sys.exit(1)
-    #     else:
-    #         pop0_seqs = []
-    #         pop1_seqs = []
-    #         for y in range(0,len(self)):
-    #             if pops[0] in self[y].id:
-    #                 pop0_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
-    #             elif pops[1] in self[y].id:
-    #                 pop1_seqs.append(XSeq(str(self[y].seq.upper()), generic_dna))
-    #         if len(pop0_seqs) < 2:
-    #             return None
-    #         elif len(pop1_seqs) < 2:
-    #             return None
-    #         else:
-    #             within_variations1 = []
-    #             for x in range(0,len(pop0_seqs)-1):
-    #                 for y in range(x+1,len(pop0_seqs)):
-    #                     within_variations1.append(pop0_seqs[x].get_distance_to(pop0_seqs[y], False))
-    #             within_variations2 = []
-    #             for x in range(0,len(pop1_seqs)-1):
-    #                 for y in range(x+1,len(pop1_seqs)):
-    #                     within_variations2.append(pop1_seqs[x].get_distance_to(pop1_seqs[y], False))
-    #             between_variations = []
-    #             for x in range(0,len(pop0_seqs)-1):
-    #                 for y in range(0,len(pop1_seqs)):
-    #                     between_variations.append(pop0_seqs[x].get_distance_to(pop1_seqs[y], False))
-    #             sum_within1 = sum(within_variations1)
-    #             sum_within2 = sum(within_variations2)
-    #             sum_between = sum(between_variations)
-    #             d_a = sum_between - (sum_within1 + sum_within2)/2
-    #         if d_a == 0:
-    #             return None
-    #         else:
-    #             return d_a
-
 
 # Parse the command line arguments.
 parser = argparse.ArgumentParser(
@@ -2164,19 +2224,19 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 0.981')
+    version='%(prog)s 0.99')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
     type=str,
-    help="One or more population identifiers.")
+    help="One or more population identifiers (default: none).")
 parser.add_argument(
     '-f', '--from',
     nargs=1,
     type=int,
     default=[1],
     dest='start',
-    help="Start position of analysis window (first = 1)"
+    help="Start position of analysis window (count starts at 1) (default: 1)."
     )
 parser.add_argument(
     '-t', '--to',
@@ -2184,7 +2244,7 @@ parser.add_argument(
     type=int,
     default=[-1],
     dest='end',
-    help="End position of analysis window (first = 1)"
+    help="End position of analysis window (count starts at 1) (default: last position of alignment)."
     )
 parser.add_argument(
     '-e', '--min-edge-length',
@@ -2192,7 +2252,7 @@ parser.add_argument(
     type=int,
     default=[1],
     dest='min_edge_length',
-    help="Minimum edge length for display in haplotype genealogy"
+    help="Minimum edge length for display in haplotype genealogy (default: 1)."
     )
 parser.add_argument(
     '-n', '--min-node-size',
@@ -2200,13 +2260,19 @@ parser.add_argument(
     type=int,
     default=[1],
     dest='min_node_size',
-    help="Minimum node size for display in haplotype genealogy"
+    help="Minimum node size for display in haplotype genealogy (default: 1)."
     )
 parser.add_argument(
     '-x', '--transversions-only',
     action='store_true',
     dest='transversions_only',
-    help="Ignore transitions and show transversions only"
+    help="Ignore transitions and show transversions only (default: off)."
+    )
+parser.add_argument(
+    '--haploid',
+    action='store_true',
+    dest='haploid',
+    help="Sequences are haploid (default: off). This only affects Fst calculations. If not specified, each pair of two consecutive sequences is assumed to be from the same individual."
     )
 parser.add_argument(
     '-s', '--seed',
@@ -2214,7 +2280,7 @@ parser.add_argument(
     type=int,
     default=[-1],
     dest='seed',
-    help="random number seed"
+    help="Specifies a random number seed."
     )
 parser.add_argument(
     'infile',
@@ -2236,6 +2302,7 @@ minimum_edge_length = args.min_edge_length[0]
 minimum_node_size = args.min_node_size[0]
 seed = args.seed[0]
 transversions_only = args.transversions_only
+haploid = args.haploid
 
 # Initialize the random number generator if a seed value has been provided.
 if seed != -1:
@@ -2329,6 +2396,8 @@ if inlines[0][0] == '#':
             tree_string = tree_patterns.group(0)
             tree = Tree(tree_string)
     align = XMultipleSeqAlignment(records)
+    if haploid:
+        align.set_is_haploid(True)
 elif inlines[0][0] == "(":
     # Assume the input is in newick format.
     tree_string_raw = inlines[0]
@@ -2746,7 +2815,7 @@ html_string += '        </tr>\n'
 # The between population differentiation section.
 if pops != None and len(pops) > 1:
     html_string += '        <tr class="smallSpaceUnder">\n'
-    html_string += '          <td style="font-size:30px; font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12842/abstract">Between-population differentiation</a></td>\n'
+    html_string += '          <td style="font-size:30px; font-weight:bold">Between-population differentiation</td>\n'
     html_string += '        </tr>\n'
     html_string += '        <tr class="largeSpaceUnder">\n'
     html_string += '          <td style="font-family:helvetica; font-size:12px">\n'
@@ -2754,8 +2823,8 @@ if pops != None and len(pops) > 1:
     html_string += '              <tr>\n'
     html_string += '                <td width="168" style="font-weight:bold">Population 1</td>\n'
     html_string += '                <td width="168" style="font-weight:bold">Population 2</td>\n'
-    html_string += '                <td width="168" style="font-weight:bold">F<sub>ST</sub></td>\n'
-    html_string += '                <td width="168" style="font-weight:bold">d<sub>XY</td>\n'
+    html_string += '                <td width="168" style="font-weight:bold"><a href="http://www.jstor.org/stable/2408641">F<sub>ST</sub></a></td>\n'
+    html_string += '                <td width="168" style="font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12842/abstract">d<sub>XY</a></td>\n'
     html_string += '                <td width="168" style="font-weight:bold">d<sub>f</td>\n'
     html_string += '              </tr>\n'
     for x in range(0,len(pops)-1):
@@ -2798,14 +2867,14 @@ if pops != None and len(pops) > 1:
 # The genealogical sorting index section.
 if len(pops) > 0:
     html_string += '        <tr class="smallSpaceUnder">\n'
-    html_string += '          <td style="font-size:30px; font-weight:bold"><a href="http://www.bioone.org/doi/abs/10.1111/j.1558-5646.2008.00442.x">Genealogical sorting index</a></td>\n'
+    html_string += '          <td style="font-size:30px; font-weight:bold">Genealogical sorting index</td>\n'
     html_string += '        </tr>\n'
     html_string += '        <tr class="largeSpaceUnder">\n'
     html_string += '          <td style="font-family:helvetica; font-size:12px">\n'
     html_string += '            <table width="840" border="0" cellpadding="0" cellspacing="1">\n'
     html_string += '              <tr>\n'
     html_string += '                <td width="168" style="font-weight:bold">Population</td>\n'
-    html_string += '                <td width="672" style="font-weight:bold">gsi</td>\n'
+    html_string += '                <td width="672" style="font-weight:bold"><a href="http://www.bioone.org/doi/abs/10.1111/j.1558-5646.2008.00442.x">gsi</a></td>\n'
     html_string += '              </tr>\n'
     for x in range(0,len(pops)):
         html_string += '              <tr>\n'
