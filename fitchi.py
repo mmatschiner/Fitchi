@@ -2398,6 +2398,8 @@ if inlines[0][0] == '#':
     align = XMultipleSeqAlignment(records)
     if haploid:
         align.set_is_haploid(True)
+    else:
+        align.set_is_haploid(False)
 elif inlines[0][0] == "(":
     # Assume the input is in newick format.
     tree_string_raw = inlines[0]
