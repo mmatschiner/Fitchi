@@ -1,6 +1,6 @@
 #!/usr/local/bin/python3
 
-# Michael Matschiner, 2015-04-15
+# Michael Matschiner, 2015-05-11
 # michaelmatschiner@mac.com
 
 # Import libraries and make sure we're on python 3.
@@ -2230,7 +2230,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 0.99')
+    version='%(prog)s 0.991')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
@@ -2376,7 +2376,7 @@ if inlines[0][0] == '#':
     in_tree = False
     records = []
     for line in inlines:
-        if line.strip() == 'matrix':
+        if line.lower().strip() == 'matrix':
             in_matrix = True
         elif line.strip() == ';':
             in_matrix = False
@@ -2401,6 +2401,8 @@ if inlines[0][0] == '#':
             tree_patterns = re.search('\(.+\)',tree_string_raw)
             tree_string = tree_patterns.group(0)
             tree = Tree(tree_string)
+    if records == []:
+        print("ERROR: File could not be parsed!")
     align = XMultipleSeqAlignment(records)
     if haploid:
         align.set_is_haploid(True)
