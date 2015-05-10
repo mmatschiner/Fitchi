@@ -2071,44 +2071,47 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
                     ninds_dup_1_this_site = len(good_pairs_of_alleles_pop1)
                     ninds_dup_2_this_site = len(good_pairs_of_alleles_pop2)
 
-                    # Get the frequencies of the two alleles, for this site.
-                    allele_A_occurrences_pop1 = 0
-                    allele_A_occurrences_pop2 = 0
-                    for good_pair_of_alleles_pop1 in good_pairs_of_alleles_pop1:
-                        for good_allele_pop1 in good_pair_of_alleles_pop1:
-                            if good_allele_pop1 == unique_alleles_both_pops[0]:
-                                allele_A_occurrences_pop1 += 1
-                            elif good_allele_pop1 != unique_alleles_both_pops[1]:
-                                print("ERROR: Unexpected allele found at site " + x + ": " + good_allele_pop1 + "!")
-                                sys.exit(1)
-                    for good_pair_of_alleles_pop2 in good_pairs_of_alleles_pop2:
-                        for good_allele_pop2 in good_pair_of_alleles_pop2:
-                            if good_allele_pop2 == unique_alleles_both_pops[0]:
-                                allele_A_occurrences_pop2 += 1
-                            elif good_allele_pop2 != unique_alleles_both_pops[1]:
-                                print("ERROR: Unexpected allele found at site " + x + ": " + good_allele_pop2 + "!")
-                                sys.exit(1)
-                    p1_this_site = allele_A_occurrences_pop1/(len(good_pairs_of_alleles_pop1)*2)
-                    p2_this_site = allele_A_occurrences_pop2/(len(good_pairs_of_alleles_pop2)*2)
+                    # Continue only if good individuals are found in both populations, for this site.
+                    if ninds_dup_1_this_site > 0 and ninds_dup_2_this_site > 0:
 
-                    # Get the frequencies of heterozygotes, for this site.
-                    heterozygote_occurrences_pop1 = 0
-                    heterozygote_occurrences_pop2 = 0
-                    for good_pair_of_alleles_pop1 in good_pairs_of_alleles_pop1:
-                        if good_pair_of_alleles_pop1[0] != good_pair_of_alleles_pop1[1]:
-                            heterozygote_occurrences_pop1 += 1
-                    for good_pair_of_alleles_pop2 in good_pairs_of_alleles_pop2:
-                        if good_pair_of_alleles_pop2[0] != good_pair_of_alleles_pop2[1]:
-                            heterozygote_occurrences_pop2 += 1
-                    oh1_this_site = heterozygote_occurrences_pop1/len(good_pairs_of_alleles_pop1)
-                    oh2_this_site = heterozygote_occurrences_pop2/len(good_pairs_of_alleles_pop2)
+                        # Get the frequencies of the two alleles, for this site.
+                        allele_A_occurrences_pop1 = 0
+                        allele_A_occurrences_pop2 = 0
+                        for good_pair_of_alleles_pop1 in good_pairs_of_alleles_pop1:
+                            for good_allele_pop1 in good_pair_of_alleles_pop1:
+                                if good_allele_pop1 == unique_alleles_both_pops[0]:
+                                    allele_A_occurrences_pop1 += 1
+                                elif good_allele_pop1 != unique_alleles_both_pops[1]:
+                                    print("ERROR: Unexpected allele found at site " + x + ": " + good_allele_pop1 + "!")
+                                    sys.exit(1)
+                        for good_pair_of_alleles_pop2 in good_pairs_of_alleles_pop2:
+                            for good_allele_pop2 in good_pair_of_alleles_pop2:
+                                if good_allele_pop2 == unique_alleles_both_pops[0]:
+                                    allele_A_occurrences_pop2 += 1
+                                elif good_allele_pop2 != unique_alleles_both_pops[1]:
+                                    print("ERROR: Unexpected allele found at site " + x + ": " + good_allele_pop2 + "!")
+                                    sys.exit(1)
+                        p1_this_site = allele_A_occurrences_pop1/(len(good_pairs_of_alleles_pop1)*2)
+                        p2_this_site = allele_A_occurrences_pop2/(len(good_pairs_of_alleles_pop2)*2)
 
-                    ninds_dup_1.append(ninds_dup_1_this_site)
-                    ninds_dup_2.append(ninds_dup_2_this_site)
-                    p1.append(p1_this_site)
-                    p2.append(p2_this_site)
-                    oh1.append(oh1_this_site)
-                    oh2.append(oh2_this_site)
+                        # Get the frequencies of heterozygotes, for this site.
+                        heterozygote_occurrences_pop1 = 0
+                        heterozygote_occurrences_pop2 = 0
+                        for good_pair_of_alleles_pop1 in good_pairs_of_alleles_pop1:
+                            if good_pair_of_alleles_pop1[0] != good_pair_of_alleles_pop1[1]:
+                                heterozygote_occurrences_pop1 += 1
+                        for good_pair_of_alleles_pop2 in good_pairs_of_alleles_pop2:
+                            if good_pair_of_alleles_pop2[0] != good_pair_of_alleles_pop2[1]:
+                                heterozygote_occurrences_pop2 += 1
+                        oh1_this_site = heterozygote_occurrences_pop1/len(good_pairs_of_alleles_pop1)
+                        oh2_this_site = heterozygote_occurrences_pop2/len(good_pairs_of_alleles_pop2)
+
+                        ninds_dup_1.append(ninds_dup_1_this_site)
+                        ninds_dup_2.append(ninds_dup_2_this_site)
+                        p1.append(p1_this_site)
+                        p2.append(p2_this_site)
+                        oh1.append(oh1_this_site)
+                        oh2.append(oh2_this_site)
 
             # Calculation of Fst according to Weir & Cockerham (1984), as in method stamppFst of R package StAMPP.
             # n_bar is the average number of individuals in a population, for each locus.
@@ -2148,8 +2151,11 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
                 c_cand = (1/2) * h_bar[x]
                 if not math.isnan(c_cand):
                     c.append(c_cand)
-            fst = sum(a)/(sum(a) + sum(b) + sum(c))
-            return fst
+            if (sum(a) + sum(b) + sum(c)) == 0:
+                return None
+            else:
+                fst = sum(a)/(sum(a) + sum(b) + sum(c))
+                return fst
 
     def get_d_xy(self, pops=[]):
         if len(pops) != 2:
