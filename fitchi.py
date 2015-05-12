@@ -53,8 +53,33 @@ class Tree(object):
         number_of_internal_nodes = 0
         number_of_edges = 0
 
+        # Remove comments from the tree string.
+        pattern = re.compile("\[.*?\]")
+        hit = "placeholder"
+        while hit != None:
+            hit = pattern.search(self.newick_string)
+            if hit != None:
+                self.newick_string = self.newick_string.replace(hit.group(0),"")
+
+        # Check whether a branch above the root is present, and if so, remove it.
+        if self.newick_string[0:2] == "((" and self.newick_string[-1] == ")" and self.newick_string[-2] != ")":
+            level = 0
+            newick_string_tail_start_pos = 0
+            newick_string_tail = ""
+            for pos in range(len(self.newick_string)):
+                if self.newick_string[pos] == "(":
+                    level += 1
+                if self.newick_string[pos] == ")":
+                    level -= 1
+                if level == 1 and pos > 1:
+                    newick_string_tail_start_pos = pos
+                    newick_string_tail = self.newick_string[pos+1:]
+                    break
+            if newick_string_tail.count(",") == 0:
+                self.newick_string = self.newick_string[1:newick_string_tail_start_pos+1]
+
         # Parse the bifurcating part of the tree.
-        pattern = re.compile("\(([a-zA-Z0-9_\.]+?):([\d\.Ee-]+?)\,([a-zA-Z0-9_\.]+?):([\d\.Ee-]+?)\)")
+        pattern = re.compile("\(([a-zA-Z0-9_\.\-]+?):([\d\.Ee-]+?)\,([a-zA-Z0-9_\.\-]+?):([\d\.Ee-]+?)\)")
         hit = "placeholder"
         while hit != None:
             hit = pattern.search(self.newick_string)
@@ -65,7 +90,7 @@ class Tree(object):
                 edge1 = Edge("edge" + str(number_of_edges-1) + "X")
                 self.increase_max_number_of_edges()
                 edge1.set_node_ids([internal_node_id, hit.group(1)])
-                edge1.set_length(float(hit.group(2)))
+                # edge1.set_length(float(hit.group(2)))
                 node1 = Node(hit.group(1), False, self.pops)
                 node1.set_parent_id(internal_node_id)
                 if hit.group(1)[:12] == 'internalNode':
@@ -76,7 +101,7 @@ class Tree(object):
                 edge2 = Edge("edge" + str(number_of_edges) + "X")
                 self.increase_max_number_of_edges()
                 edge2.set_node_ids([internal_node_id, hit.group(3)])
-                edge2.set_length(float(hit.group(4)))
+                # edge2.set_length(float(hit.group(4)))
                 node2 = Node(hit.group(3), False, self.pops)
                 node2.set_parent_id(internal_node_id)
                 if hit.group(3)[:12] == 'internalNode':
@@ -90,10 +115,10 @@ class Tree(object):
                 self.nodes.append(node2)
                 self.newick_string = self.newick_string.replace(hit.group(0), internal_node_id)
 
-        # Parse the remaining string with three branches (since the tree is unrooted).
-        pattern_unrooted = re.compile("\(([a-zA-Z0-9_\.]+?):([\d\.Ee-]+?),([a-zA-Z0-9_\.]+?):([\d\.Ee-]+?),([a-zA-Z0-9_\.]+?):([\d\.Ee-]+?)\)")
+        # Parse the remaining string with three branches (if the tree is unrooted).
+        pattern_unrooted = re.compile("^\(([a-zA-Z0-9_\.\-]+?):([\d\.Ee-]+?),([a-zA-Z0-9_\.\-]+?):([\d\.Ee-]+?),([a-zA-Z0-9_\.\-]+?):([\d\.Ee-]+?)\)$")
         hit_unrooted = pattern_unrooted.search(self.newick_string)
-        pattern_rooted = re.compile("internalNode\d+X")
+        pattern_rooted = re.compile("^internalNode\d+X$")
         hit_rooted = pattern_rooted.search(self.newick_string)
         if hit_unrooted != None:
             number_of_internal_nodes += 1
@@ -102,15 +127,15 @@ class Tree(object):
             edge1 = Edge("edge" + str(number_of_edges-2) + "X")
             self.increase_max_number_of_edges()
             edge1.set_node_ids([root_node_id, hit_unrooted.group(1)])
-            edge1.set_length(float(hit_unrooted.group(2)))
+            # edge1.set_length(float(hit_unrooted.group(2)))
             edge2 = Edge("edge" + str(number_of_edges-1) + "X")
             self.increase_max_number_of_edges()
             edge2.set_node_ids([root_node_id, hit_unrooted.group(3)])
-            edge2.set_length(float(hit_unrooted.group(4)))
+            # edge2.set_length(float(hit_unrooted.group(4)))
             edge3 = Edge("edge" + str(number_of_edges) + "X")
             self.increase_max_number_of_edges()
             edge3.set_node_ids([root_node_id, hit_unrooted.group(5)])
-            edge3.set_length(float(hit_unrooted.group(6)))
+            # edge3.set_length(float(hit_unrooted.group(6)))
             node1 = Node(hit_unrooted.group(1), False, self.pops)
             node1.set_parent_id(root_node_id)
             node2 = Node(hit_unrooted.group(3), False, self.pops)
@@ -145,17 +170,24 @@ class Tree(object):
             node.set_size(0)
             self.nodes.append(node)
         else:
-            print(self.newick_string)
             print('ERROR: The newick tree string could not be parsed!')
+            print(self.newick_string)
             sys.exit(1)
+
+        # for node in self.nodes:
+        #     print(node.info())
 
         # Add info about children to each node.
         count = 0
         for node in self.nodes:
+            parent_found = False
             for parent in self.nodes:
                 if node.get_parent_id() == parent.get_id():
                     parent.add_child_id(node.get_id())
-                    break
+                    parent_found = True
+            if node.get_is_root() == False and parent_found == False:
+                print("ERROR: The parent of node " + node.id + " named " + node.get_parent_id() + " could not be found!")
+                sys.exit(1)
 
         # Calculate the distances to the root for each node.
         self.set_node_distances_to_root()
@@ -163,6 +195,14 @@ class Tree(object):
     def set_node_distances_to_root(self):
         # Reset max_dist_to_root.
         self.max_dist_to_root = 0
+        # First make sure that one of the nodes is the root.
+        there_is_a_root = False
+        for node in self.nodes:
+            if node.get_is_root():
+                there_is_a_root = True
+        if there_is_a_root == False:
+            print("ERROR: No node is the root!")
+            sys.exit(1)
         # Add distance to root for each node.
         for node in self.nodes:
             dist = 0
@@ -172,12 +212,18 @@ class Tree(object):
                 while root_found == False:
                     dist += 1
                     # Find the parental node.
+                    parent_found = False
                     for parent in self.nodes:
                         if tmp_node.get_parent_id() == parent.get_id():
                             tmp_node = parent
+                            parent_found = True
                             break
                     if tmp_node.get_is_root():
                         root_found = True
+                    elif parent_found == False:
+                        print("ERROR: The parent of node " + tmp_node.id + " could not be found!")
+                        sys.exit(1)
+
             node.set_distance_to_root(dist)
             if dist > self.max_dist_to_root:
                 self.max_dist_to_root = dist
@@ -458,18 +504,18 @@ class Tree(object):
                                     if node_id in edge_node_ids:
                                         if child_id in edge_node_ids:
                                             downstream_edge_fitch_distance = edge.get_fitch_distance()
-                                            downstream_edge_length = edge.get_length()
+                                            # downstream_edge_length = edge.get_length()
                                             edge.set_is_removed(True)
                                         elif parent_id in edge_node_ids:
                                             upstream_edge_fitch_distance = edge.get_fitch_distance()
-                                            upstream_edge_length = edge.get_length()
+                                            # upstream_edge_length = edge.get_length()
                                             edge.set_is_removed(True)
                             new_edge = Edge("edge" + str(self.get_max_number_of_edges()) + "X")
                             self.increase_max_number_of_edges()
                             new_edge.set_node_ids([parent_id,child_id])
-                            new_edge_length = downstream_edge_length
-                            new_edge_length += upstream_edge_length
-                            new_edge.set_length(new_edge_length)
+                            # new_edge_length = downstream_edge_length
+                            # new_edge_length += upstream_edge_length
+                            # new_edge.set_length(new_edge_length)
                             new_edge_fitch_distance = downstream_edge_fitch_distance 
                             new_edge_fitch_distance += upstream_edge_fitch_distance
                             new_edge.set_fitch_distance(new_edge_fitch_distance)
@@ -522,18 +568,18 @@ class Tree(object):
                         new_root.add_child_id(new_root_child.get_id())
                         new_root_child.set_parent_id(new_root.get_id())
                         # Combine the two edges that connected to the old root to a new one.
-                        new_root_edge_length = 0
+                        # new_root_edge_length = 0
                         new_root_edge_fitch_distance = 0
                         for old_root_edge in self.edges:
                             old_root_edge_node_ids = old_root_edge.get_node_ids()
                             if old_root.get_id() in old_root_edge_node_ids:
-                                new_root_edge_length += old_root_edge.get_length()
+                                # new_root_edge_length += old_root_edge.get_length()
                                 new_root_edge_fitch_distance += old_root_edge.get_fitch_distance()
                                 old_root_edge.set_is_removed(True)
                         new_root_edge = Edge("edge" + str(self.get_max_number_of_edges()) + "X")
                         self.increase_max_number_of_edges()
                         new_root_edge.set_node_ids([new_root.get_id(),new_root_child.get_id()])
-                        new_root_edge.set_length(new_root_edge_length)
+                        # new_root_edge.set_length(new_root_edge_length)
                         new_root_edge.set_fitch_distance(new_root_edge_fitch_distance)
                         self.edges.append(new_root_edge)
                         change = True
@@ -1514,11 +1560,11 @@ class Edge(object):
     def get_node_ids(self):
         return self.node_ids
 
-    def set_length(self, length):
-        self.length = length
+    # def set_length(self, length):
+    #     self.length = length
 
-    def get_length(self):
-        return self.length
+    # def get_length(self):
+    #     return self.length
 
     def set_fitch_distance(self, fitch_dist):
         self.fitch_distance = fitch_dist
@@ -2370,7 +2416,7 @@ rest_color = '93a1a1'
 align = None
 tree = None
 inlines = infile.readlines()
-if inlines[0][0] == '#':
+if inlines[0][0:6].lower() == '#nexus':
     # Assume the input is in nexus format. Maximally one tree string is read.
     in_matrix = False
     in_tree = False
@@ -2382,7 +2428,20 @@ if inlines[0][0] == '#':
             in_matrix = False
             in_tree = False
         elif in_matrix and line.strip() is not '':
-            seq_string = line.split()[1].upper()
+            line_ary = line.split()
+            if len(line_ary) == 1:
+                print("ERROR: Could not parse the alignment (should be sequential nexus format, but looks like it is interleaved)!")
+                sys.exit(1)
+            elif len(line_ary) > 2:
+                print("ERROR: Could not parse the alignment!")
+                sys.exit(1)
+            else:
+                seq_string = line_ary[1].upper()
+            pattern = re.compile("^[a-zA-Z0-9_\.\-]+?$")
+            hit = pattern.search(line_ary[0])
+            if hit == None:
+                print("ERROR: Taxon labels should include only 'A'-'Z', 'a'-'z', '0'-'9', '.', _', and '-'! Offending taxon label: " + line_ary[0] + ".")
+                sys.exit(1)
             if window_end_pos == -1:
                 seq_string = seq_string[window_start_pos:]
             else:
@@ -2391,7 +2450,7 @@ if inlines[0][0] == '#':
                 SeqRecord(
                     Seq(seq_string,
                         generic_dna),
-                        id = line.split()[0]))
+                        id = line_ary[0]))
         elif line.strip() == 'begin trees;':
             in_tree = True
         elif line.strip() == 'end;':
@@ -2403,17 +2462,17 @@ if inlines[0][0] == '#':
             tree = Tree(tree_string)
     if records == []:
         print("ERROR: File could not be parsed!")
+    else:
+        for record in records:
+            if record.id not in tree_string:
+                print("ERROR: Record id " + record.id + " not found in tree string!")
+                sys.exit(0)
+
     align = XMultipleSeqAlignment(records)
     if haploid:
         align.set_is_haploid(True)
     else:
         align.set_is_haploid(False)
-elif inlines[0][0] == "(":
-    # Assume the input is in newick format.
-    tree_string_raw = inlines[0]
-    tree_patterns = re.search('\(.+\)',tree_string_raw)
-    tree_string = tree_patterns.group(0)
-    tree = Tree(tree_string)
 else:
     print("ERROR: Unexpected file format!")
     sys.exit(1)
