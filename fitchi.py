@@ -2125,17 +2125,17 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
                         allele_A_occurrences_pop2 = 0
                         for good_pair_of_alleles_pop1 in good_pairs_of_alleles_pop1:
                             for good_allele_pop1 in good_pair_of_alleles_pop1:
-                                if good_allele_pop1 == unique_alleles_both_pops[0]:
+                                if good_allele_pop1 == good_unique_alleles_both_pops[0]:
                                     allele_A_occurrences_pop1 += 1
-                                elif good_allele_pop1 != unique_alleles_both_pops[1]:
-                                    print("ERROR: Unexpected allele found at site " + x + ": " + good_allele_pop1 + "!")
+                                elif good_allele_pop1 != good_unique_alleles_both_pops[1]:
+                                    print("ERROR: Unexpected allele found at site " + str(x) + ": " + good_allele_pop1 + "!")
                                     sys.exit(1)
                         for good_pair_of_alleles_pop2 in good_pairs_of_alleles_pop2:
                             for good_allele_pop2 in good_pair_of_alleles_pop2:
-                                if good_allele_pop2 == unique_alleles_both_pops[0]:
+                                if good_allele_pop2 == good_unique_alleles_both_pops[0]:
                                     allele_A_occurrences_pop2 += 1
-                                elif good_allele_pop2 != unique_alleles_both_pops[1]:
-                                    print("ERROR: Unexpected allele found at site " + x + ": " + good_allele_pop2 + "!")
+                                elif good_allele_pop2 != good_unique_alleles_both_pops[1]:
+                                    print("ERROR: Unexpected allele found at site " + str(x) + ": " + good_allele_pop2 + "!")
                                     sys.exit(1)
                         p1_this_site = allele_A_occurrences_pop1/(len(good_pairs_of_alleles_pop1)*2)
                         p2_this_site = allele_A_occurrences_pop2/(len(good_pairs_of_alleles_pop2)*2)
@@ -2182,21 +2182,24 @@ class XMultipleSeqAlignment(MultipleSeqAlignment):
             # Equation 2 in WC84.
             a = []
             for x in range(len(ninds_dup_1)):
-                a_cand = (n_bar[x]/nc[x]) * (s_square[x] - (1/(n_bar[x] - 1)) * ((p_bar[x] * (1 - p_bar[x])) - (((r - 1)/r) * s_square[x]) - ((1/4) * h_bar[x])))
-                if not math.isnan(a_cand):
-                    a.append(a_cand)
+                if n_bar[x] > 1:
+                    a_cand = (n_bar[x]/nc[x]) * (s_square[x] - (1/(n_bar[x] - 1)) * ((p_bar[x] * (1 - p_bar[x])) - (((r - 1)/r) * s_square[x]) - ((1/4) * h_bar[x])))
+                    if not math.isnan(a_cand):
+                        a.append(a_cand)
             # Equation 3 in WC84.
             b = []
             for x in range(len(ninds_dup_1)):
-                b_cand = (n_bar[x]/(n_bar[x] - 1)) * ((p_bar[x] * (1 - p_bar[x])) - (((r - 1)/r) * s_square[x]) - (((2 * n_bar[x] - 1)/(4 * n_bar[x])) * h_bar[x]))
-                if not math.isnan(b_cand):
-                    b.append(b_cand)
+                if n_bar[x] > 1:
+                    b_cand = (n_bar[x]/(n_bar[x] - 1)) * ((p_bar[x] * (1 - p_bar[x])) - (((r - 1)/r) * s_square[x]) - (((2 * n_bar[x] - 1)/(4 * n_bar[x])) * h_bar[x]))
+                    if not math.isnan(b_cand):
+                        b.append(b_cand)
             # Equation 4 in WC84.
             c = []
             for x in range(len(ninds_dup_1)):
-                c_cand = (1/2) * h_bar[x]
-                if not math.isnan(c_cand):
-                    c.append(c_cand)
+                if n_bar[x] > 1:
+                    c_cand = (1/2) * h_bar[x]
+                    if not math.isnan(c_cand):
+                        c.append(c_cand)
             if (sum(a) + sum(b) + sum(c)) == 0:
                 return None
             else:
