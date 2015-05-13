@@ -2752,45 +2752,51 @@ html_string += '        <tr class="spaceOverAndLargeSpaceUnder">\n'
 html_string += '          <td align="center">\n'
 html_string += '            <span id="legend" style="display:none;">\n'
 html_string += '              <div style="border-width:1px; border-style:solid; border-color:#000000;">\n'
-html_string += '                <table width="800" cellpadding="0" cellspacing="1">\n'
-html_string += '                  <tr class="spaceOver">\n'
-html_string += '                    <td width="160" style="font-weight:bold; font-family:Courier">Population</td>\n'
-html_string += '                    <td width="80" style="font-weight:bold; font-family:Courier" colspan="2">Color</td>\n'
-html_string += '                    <td width="250" style="font-weight:bold; font-family:Courier"># Nodes with population presence</td>\n'
-html_string += '                    <td width="210" style="font-weight:bold; font-family:Courier">% Presence in non-empty nodes</td>\n'
-html_string += '                  </tr>\n'
-pop_count = 0
-for pop in pops:
-    html_string += '                  <tr>\n'
-    html_string += '                    <td width="160" style="font-family:Courier">' + pop + '</td>\n'
-    if pop_count >= len(colors):
-        html_string += '                    <td width="40" bgcolor="#' + rest_color + '"></td>\n'
-    else:
-        html_string += '                    <td width="40" bgcolor="#' + colors[pop_count] + '"></td>\n'
-    html_string += '                    <td width="40"></td>\n'
-    node_count_with_pop = 0
-    non_empty_node_count = 0
-    for node in tree.get_nodes():
-        if pop in node.get_pops():
-            node_count_with_pop += 1
-        if node.get_size() > 0:
-            non_empty_node_count += 1
-    html_string += '                    <td style="font-family:Courier">' + str(node_count_with_pop) + '</td>\n'
-    if non_empty_node_count > 0:
-        html_string += '                    <td style="font-family:Courier">' + "{0:.2f}".format(100*node_count_with_pop/non_empty_node_count) + '</td>\n'
-    else:
-        html_string += '                    <td style="font-family:Courier">NA</td>\n'
+if pops != []:
+    html_string += '                <table width="800" cellpadding="0" cellspacing="1">\n'
+    html_string += '                  <tr class="spaceOver">\n'
+    html_string += '                    <td width="160" style="font-weight:bold; font-family:Courier">Population</td>\n'
+    html_string += '                    <td width="80" style="font-weight:bold; font-family:Courier" colspan="2">Color</td>\n'
+    html_string += '                    <td width="250" style="font-weight:bold; font-family:Courier"># Nodes with population presence</td>\n'
+    html_string += '                    <td width="210" style="font-weight:bold; font-family:Courier">% Presence in non-empty nodes</td>\n'
     html_string += '                  </tr>\n'
-    pop_count += 1
-html_string += '                  <tr class="doubleSpaceUnder">\n'
-html_string += '                    <td colspan="5"></td>\n'
-html_string += '                  </tr>\n'
-html_string += '                </table>\n'
+    pop_count = 0
+    for pop in pops:
+        html_string += '                  <tr>\n'
+        html_string += '                    <td width="160" style="font-family:Courier">' + pop + '</td>\n'
+        if pop_count >= len(colors):
+            html_string += '                    <td width="40" bgcolor="#' + rest_color + '"></td>\n'
+        else:
+            html_string += '                    <td width="40" bgcolor="#' + colors[pop_count] + '"></td>\n'
+        html_string += '                    <td width="40"></td>\n'
+        node_count_with_pop = 0
+        non_empty_node_count = 0
+        for node in tree.get_nodes():
+            if pop in node.get_pops():
+                node_count_with_pop += 1
+            if node.get_size() > 0:
+                non_empty_node_count += 1
+        html_string += '                    <td style="font-family:Courier">' + str(node_count_with_pop) + '</td>\n'
+        if non_empty_node_count > 0:
+            html_string += '                    <td style="font-family:Courier">' + "{0:.2f}".format(100*node_count_with_pop/non_empty_node_count) + '</td>\n'
+        else:
+            html_string += '                    <td style="font-family:Courier">NA</td>\n'
+        html_string += '                  </tr>\n'
+        pop_count += 1
+    html_string += '                  <tr class="doubleSpaceUnder">\n'
+    html_string += '                    <td colspan="5"></td>\n'
+    html_string += '                  </tr>\n'
+    html_string += '                </table>\n'
 html_string += '                <table width="800" cellpadding="0" cellspacing="1">\n'
 nodes = tree.get_nodes()
 node_count = 0
+first_node = True
 for node in nodes:
-    html_string += '                  <tr>\n'
+    if first_node == True:
+        first_node = False
+        html_string += '                  <tr class="spaceOver">\n'
+    else:
+        html_string += '                  <tr>\n'
     html_string += '                    <td width="160" style="font-weight:bold; font-family:Courier">Node ' + str(node_count+1) + '</td>\n'
     html_string += '                    <td></td>\n'
     html_string += '                  </tr>\n'
@@ -2815,7 +2821,7 @@ for node in nodes:
     html_string += '                    <td style="font-family:Courier">' + str(node.get_size()) + ' sequence record'
     if node.get_size() > 1:
         html_string += 's'
-    if node.get_size() > 0:
+    if node.get_size() > 0 and pops != []:
         per_pop_sizes = node.get_per_pop_sizes()
         html_string += ' ('
         pops_string = ''
