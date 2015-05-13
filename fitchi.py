@@ -640,7 +640,7 @@ class Tree(object):
         for node in self.nodes:
             node.set_per_pop_sizes(self.pops)
 
-    def position(self, algorithm, minimum_node_size, rate_multiplier):
+    def position(self, algorithm, minimum_node_size, radius_multiplier):
         G = nx.Graph()
         for node in self.nodes:
             G.add_node(node.get_id())
@@ -700,14 +700,14 @@ class Tree(object):
                 if node.get_distance_to_root() == invest_dist:
                     node_id = node.get_id()
                     # Get the radius of this node.
-                    node_radius = node.get_radius(minimum_node_size)*rate_multiplier
+                    node_radius = node.get_radius(minimum_node_size)*radius_multiplier
                     # Get the radius of the parent of this node:
                     parent_found = False
                     for parent in self.nodes:
                         if parent.get_id() == node.get_parent_id():
                             parent_found = True
                             parent_id = parent.get_id()
-                            parent_radius = parent.get_radius(minimum_node_size)*rate_multiplier
+                            parent_radius = parent.get_radius(minimum_node_size)*radius_multiplier
                             parent_x = parent.get_x()
                             parent_y = parent.get_y()
                             break
@@ -2268,7 +2268,7 @@ parser = argparse.ArgumentParser(
       %(prog)s
     -----------------------------------------
       Reads nexus formatted strings and produces
-      haplotype genealogies using the Fitch algorithm.
+      haplotype genealogy graphs using the Fitch algorithm.
       Start e.g. with
       fitchi.py example.nex example.html -p pop3 pop5
       Info: www.evoinformatics.eu/fitchi.htm
@@ -2304,7 +2304,7 @@ parser.add_argument(
     type=int,
     default=[1],
     dest='min_edge_length',
-    help="Minimum edge length for display in haplotype genealogy (default: 1)."
+    help="Minimum edge length for display in haplotype genealogy graph (default: 1)."
     )
 parser.add_argument(
     '-n', '--min-node-size',
@@ -2312,7 +2312,7 @@ parser.add_argument(
     type=int,
     default=[1],
     dest='min_node_size',
-    help="Minimum node size for display in haplotype genealogy (default: 1)."
+    help="Minimum node size for display in haplotype genealogy graph (default: 1)."
     )
 parser.add_argument(
     '-x', '--transversions-only',
@@ -2332,7 +2332,7 @@ parser.add_argument(
     type=float,
     default=[1.0],
     dest='radius_multiplier',
-    help="For purely aesthetic reasons, one might want to increase or decrease the size of all node radi. Specification of a radius multiplier allows this.")
+    help="Scale factor for the size of node radi (default: 1.0).")
 parser.add_argument(
     '-s', '--seed',
     nargs=1,
