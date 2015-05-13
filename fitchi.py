@@ -2788,6 +2788,7 @@ if pops != []:
     html_string += '                  </tr>\n'
     html_string += '                </table>\n'
 html_string += '                <table width="800" cellpadding="0" cellspacing="1">\n'
+html_string += '                  <!-- Legend: string start -->\n'
 nodes = tree.get_nodes()
 node_count = 0
 first_node = True
@@ -2850,6 +2851,7 @@ for node in nodes:
     html_string += '                    </td>\n'
     html_string += '                  </tr>\n'
     node_count += 1
+html_string += '                  <!-- Legend: string end -->\n'
 html_string += '                </table>\n'
 html_string += '              </div>\n'
 html_string += '            </span>\n'
