@@ -37,10 +37,11 @@ parser.add_argument(
     help="Section or statistic to be extracted from Fitchi HTML file. \
     	Possible arguments are: svg, svg_simple, svg_bw, \
     	svg_simple_bw (the haplotype genealogy SVG code, see manual for \
-    	details), prop_var (the proportion of variable sites in the alignments), \
-		tot_var (the total number of variable sites), fst, dxy, and df (each for \
-		the first pairwise comparison), as well as the gsi of the first (gsi1) \
-		and second (gsi2) population."
+    	details), legend (the figure legend), prop_var (the proportion of \
+    	variable sites in the alignments), tot_var (the total number of \
+    	variable sites), fst, dxy, and df (each for the first pairwise \
+    	comparison), as well as the gsi of the first (gsi1) and second \
+		(gsi2) population."
     	)
 parser.add_argument(
 	'infile',
@@ -201,6 +202,38 @@ if extract in ['svg', 'svg_simple', 'svg_bw', 'svg_simple_bw']:
 	svg_string += svg_legend_string
 	svg_string += '</svg>\n'
 	outfile.write(svg_string)
+
+# Find the figure legend.
+elif extract == 'legend':
+	lines = instring.split('\n')
+	legend_start_pattern = re.compile("<!-- Legend: string start -->")
+	legend_end_pattern = re.compile("<!-- Legend: string end -->")
+	in_legend_part = False
+	legend_string = ""
+	for line in lines:
+		legend_hit_start = re.search(legend_start_pattern, line)
+		legend_hit_end = re.search(legend_end_pattern, line)
+		if legend_hit_start != None:
+			in_legend_part = True
+		elif legend_hit_end != None:
+			in_legend_part = False
+		elif in_legend_part == True:
+			legend_string += line.strip()
+	legend_string = legend_string.replace(" class=\"spaceOver\"","")
+	legend_string = legend_string.replace(" class=\"spaceUnder\"","")
+	legend_string = legend_string.replace(" width=\"160\"","")
+	legend_string = legend_string.replace(" style=\"font-weight:bold; font-family:Courier\"","")
+	legend_string = legend_string.replace(" style=\"font-family:Courier\"","")
+	legend_string = legend_string.replace(" valign=\"top\"","")
+	legend_string = legend_string.replace("<br>","")
+	legend_string = legend_string.replace("<div style=\"width: 640px; overflow: auto;\">","")
+	legend_string = legend_string.replace("</div>","")
+	legend_ary = legend_string.split('</tr><tr>')
+	legend_table_string = ""
+	for legend_table_row in legend_ary:
+		legend_table_row = legend_table_row.replace("<tr>","").replace("</tr>","")
+		legend_table_string += legend_table_row.replace("</td><td>","\t").replace("<td>","").replace("</td>","") + "\n"
+	outfile.write(legend_table_string)
 
 # Find the total number of variable sites.
 elif extract == 'tot_var':
