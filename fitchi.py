@@ -2427,6 +2427,10 @@ if inlines[0][0:6].lower() == '#nexus':
         elif line.strip() == ';':
             in_matrix = False
             in_tree = False
+        elif "format" in line.strip().lower():
+            if "interleave" in line.strip().lower():
+                print("ERROR: Could not parse the alignment (should be sequential nexus format, but the format specification says that it is interleaved)!")
+                sys.exit(1)
         elif in_matrix and line.strip() is not '':
             line_ary = line.split()
             if len(line_ary) == 1:
