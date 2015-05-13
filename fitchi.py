@@ -1,6 +1,6 @@
 #!/usr/local/bin/python3
 
-# Michael Matschiner, 2015-05-11
+# Michael Matschiner, 2015-05-12
 # michaelmatschiner@mac.com
 
 # Import libraries and make sure we're on python 3.
@@ -640,7 +640,7 @@ class Tree(object):
         for node in self.nodes:
             node.set_per_pop_sizes(self.pops)
 
-    def position(self, algorithm, minimum_node_size):
+    def position(self, algorithm, minimum_node_size, rate_multiplier):
         G = nx.Graph()
         for node in self.nodes:
             G.add_node(node.get_id())
@@ -700,14 +700,14 @@ class Tree(object):
                 if node.get_distance_to_root() == invest_dist:
                     node_id = node.get_id()
                     # Get the radius of this node.
-                    node_radius = node.get_radius(minimum_node_size)
+                    node_radius = node.get_radius(minimum_node_size)*rate_multiplier
                     # Get the radius of the parent of this node:
                     parent_found = False
                     for parent in self.nodes:
                         if parent.get_id() == node.get_parent_id():
                             parent_found = True
                             parent_id = parent.get_id()
-                            parent_radius = parent.get_radius(minimum_node_size)
+                            parent_radius = parent.get_radius(minimum_node_size)*rate_multiplier
                             parent_x = parent.get_x()
                             parent_y = parent.get_y()
                             break
@@ -732,7 +732,7 @@ class Tree(object):
             invest_dist += 1
         self.is_positioned = True
 
-    def to_svg(self, dim_x, dim_y, margin, minimum_node_size, colors, rest_color):
+    def to_svg(self, dim_x, dim_y, margin, minimum_node_size, radius_multiplier, colors, rest_color):
         if len(self.nodes) > 0:
             # Determine the two nodes with the greatest distance to each other.
             max_node_distance = 0
@@ -780,14 +780,14 @@ class Tree(object):
             unscaled_min_y = 0
             unscaled_max_y = 0
             for node in self.nodes:
-                if node.get_x() - node.get_radius(minimum_node_size) < unscaled_min_x:
-                    unscaled_min_x = node.get_x() - node.get_radius(minimum_node_size)
-                if node.get_x() + node.get_radius(minimum_node_size) > unscaled_max_x:
-                    unscaled_max_x = node.get_x() + node.get_radius(minimum_node_size)
-                if node.get_y() - node.get_radius(minimum_node_size) < unscaled_min_y:
-                    unscaled_min_y = node.get_y() - node.get_radius(minimum_node_size)
-                if node.get_y() + node.get_radius(minimum_node_size) > unscaled_max_y:
-                    unscaled_max_y = node.get_y() + node.get_radius(minimum_node_size)
+                if node.get_x() - node.get_radius(minimum_node_size)*radius_multiplier < unscaled_min_x:
+                    unscaled_min_x = node.get_x() - node.get_radius(minimum_node_size)*radius_multiplier
+                if node.get_x() + node.get_radius(minimum_node_size)*radius_multiplier > unscaled_max_x:
+                    unscaled_max_x = node.get_x() + node.get_radius(minimum_node_size)*radius_multiplier
+                if node.get_y() - node.get_radius(minimum_node_size)*radius_multiplier < unscaled_min_y:
+                    unscaled_min_y = node.get_y() - node.get_radius(minimum_node_size)*radius_multiplier
+                if node.get_y() + node.get_radius(minimum_node_size)*radius_multiplier > unscaled_max_y:
+                    unscaled_max_y = node.get_y() + node.get_radius(minimum_node_size)*radius_multiplier
             # Determine the scale factor for all x and y values.
             scale_factor_x = (dim_x - 2*margin)/(unscaled_max_x - unscaled_min_x)
             scale_factor_y = (dim_y - 2*margin)/(unscaled_max_y - unscaled_min_y)
@@ -811,10 +811,10 @@ class Tree(object):
             top_margin = dim_y
             bottom_margin = dim_y
             for node in self.nodes:
-                if node.get_y() - node.get_radius(minimum_node_size) < top_margin:
-                    top_margin = node.get_y() - node.get_radius(minimum_node_size)
-                if dim_y - (node.get_y() + node.get_radius(minimum_node_size)) < bottom_margin:
-                    bottom_margin = dim_y - (node.get_y() + node.get_radius(minimum_node_size))
+                if node.get_y() - node.get_radius(minimum_node_size)*radius_multiplier < top_margin:
+                    top_margin = node.get_y() - node.get_radius(minimum_node_size)*radius_multiplier
+                if dim_y - (node.get_y() + node.get_radius(minimum_node_size)*radius_multiplier) < bottom_margin:
+                    bottom_margin = dim_y - (node.get_y() + node.get_radius(minimum_node_size)*radius_multiplier)
             adjusted_top_margin = top_margin % 10 + 10
             adjusted_bottom_margin = bottom_margin % 10 + 10
             top_margin_to_be_removed = top_margin - adjusted_top_margin
@@ -831,7 +831,7 @@ class Tree(object):
             font_unit = 10
             font = '\'Helvetica\''
             text_y_correction = 0.35
-            dot_radius = 1
+            dot_radius = 1.5
 
             # Start writing the svg string.
             svg_string = ''
@@ -888,7 +888,7 @@ class Tree(object):
                 svg_string += '\" cy=\"'
                 svg_string += str(node.get_y())
                 svg_string += '\" r=\"'
-                svg_string += str(node.get_radius(minimum_node_size))
+                svg_string += str(node.get_radius(minimum_node_size)*radius_multiplier)
                 svg_string += '\"/></mask>\n'
                 count += 1
             svg_string += '  </defs>\n\n'
@@ -924,11 +924,11 @@ class Tree(object):
                         if node.get_id() == edge_node_ids[0]:
                             node1_x = node.get_x()
                             node1_y = node.get_y()
-                            node1_r = node.get_radius(minimum_node_size)
+                            node1_r = node.get_radius(minimum_node_size)*radius_multiplier
                         elif node.get_id() == edge_node_ids[1]:
                             node2_x = node.get_x()
                             node2_y = node.get_y()
-                            node2_r = node.get_radius(minimum_node_size)
+                            node2_r = node.get_radius(minimum_node_size)*radius_multiplier
                     if node2_x > node1_x:
                         left_node_x = node1_x
                         left_node_y = node1_y
@@ -1006,7 +1006,7 @@ class Tree(object):
                     svg_string += '\" cy=\"'
                     svg_string += str(node.get_y())
                     svg_string += '\" r=\"'
-                    svg_string += str(node.get_radius(minimum_node_size))
+                    svg_string += str(node.get_radius(minimum_node_size)*radius_multiplier)
                     svg_string += '\"/>\n'
                     old_p =  0
                     new_p = 0
@@ -1014,10 +1014,10 @@ class Tree(object):
                         proportion = node.get_per_pop_sizes()[s] / node.get_size()
                         if proportion > 0 and proportion < 1:
                             new_p = old_p + proportion
-                            pie_start_x = node.get_x() + (node.get_radius(minimum_node_size) - 0.5*stroke_width)*math.sin(old_p*2*math.pi)
-                            pie_start_y = node.get_y() - (node.get_radius(minimum_node_size) - 0.5*stroke_width)*math.cos(old_p*2*math.pi)
-                            pie_stop_x = node.get_x() + (node.get_radius(minimum_node_size) - 0.5*stroke_width)*math.sin(new_p*2*math.pi)
-                            pie_stop_y = node.get_y() - (node.get_radius(minimum_node_size) - 0.5*stroke_width)*math.cos(new_p*2*math.pi)
+                            pie_start_x = node.get_x() + (node.get_radius(minimum_node_size)*radius_multiplier - 0.5*stroke_width)*math.sin(old_p*2*math.pi)
+                            pie_start_y = node.get_y() - (node.get_radius(minimum_node_size)*radius_multiplier - 0.5*stroke_width)*math.cos(old_p*2*math.pi)
+                            pie_stop_x = node.get_x() + (node.get_radius(minimum_node_size)*radius_multiplier - 0.5*stroke_width)*math.sin(new_p*2*math.pi)
+                            pie_stop_y = node.get_y() - (node.get_radius(minimum_node_size)*radius_multiplier - 0.5*stroke_width)*math.cos(new_p*2*math.pi)
                             svg_string += '  <path fill=\"#'
                             if s >= len(colors):
                                 svg_string += rest_color
@@ -1032,9 +1032,9 @@ class Tree(object):
                             svg_string += ','
                             svg_string += str(pie_start_y)
                             svg_string += ' A '
-                            svg_string += str(node.get_radius(minimum_node_size) - 0.5*stroke_width)
+                            svg_string += str(node.get_radius(minimum_node_size)*radius_multiplier - 0.5*stroke_width)
                             svg_string += ' '
-                            svg_string += str(node.get_radius(minimum_node_size) - 0.5*stroke_width)
+                            svg_string += str(node.get_radius(minimum_node_size)*radius_multiplier - 0.5*stroke_width)
                             svg_string += ' 0 '
                             svg_string += str(round(proportion))
                             svg_string += ' 1 '
@@ -1054,7 +1054,7 @@ class Tree(object):
                             svg_string += '\" cy=\"'
                             svg_string += str(node.get_y())
                             svg_string += '\" r=\"'
-                            svg_string += str(node.get_radius(minimum_node_size))
+                            svg_string += str(node.get_radius(minimum_node_size)*radius_multiplier)
                             svg_string += '\"/>\n'
                         elif proportion > 1 or proportion < 0:
                             warn_string = ''
@@ -1083,7 +1083,7 @@ class Tree(object):
                 svg_string += '\" cy=\"'
                 svg_string += str(node.get_y())
                 svg_string += '\" r=\"'
-                svg_string += str(node.get_radius(minimum_node_size))
+                svg_string += str(node.get_radius(minimum_node_size)*radius_multiplier)
                 svg_string += '\" mask=\"url(#m_'
                 svg_string += str(count)
                 svg_string += ')\"/>\n'
@@ -2276,7 +2276,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 0.991')
+    version='%(prog)s 0.995')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
@@ -2327,6 +2327,13 @@ parser.add_argument(
     help="Sequences are haploid (default: off). This only affects Fst calculations. If not specified, each pair of two consecutive sequences is assumed to be from the same individual."
     )
 parser.add_argument(
+    '-m', '--radius-multiplier',
+    nargs=1,
+    type=float,
+    default=[1.0],
+    dest='radius_multiplier',
+    help="For purely aesthetic reasons, one might want to increase or decrease the size of all node radi. Specification of a radius multiplier allows this.")
+parser.add_argument(
     '-s', '--seed',
     nargs=1,
     type=int,
@@ -2352,6 +2359,7 @@ window_start_pos = args.start[0]-1
 window_end_pos = args.end[-1]
 minimum_edge_length = args.min_edge_length[0]
 minimum_node_size = args.min_node_size[0]
+radius_multiplier = args.radius_multiplier[0]
 seed = args.seed[0]
 transversions_only = args.transversions_only
 haploid = args.haploid
@@ -2522,10 +2530,10 @@ for pop in pops:
 tree.reduce(minimum_edge_length, minimum_node_size)
 
 # Position the tree.
-tree.position('neato', minimum_node_size)
+tree.position('neato', minimum_node_size, radius_multiplier)
 
 # Produce the svg tree string.
-svg_string = tree.to_svg(840, 700, 10, minimum_node_size, colors, rest_color)
+svg_string = tree.to_svg(840, 700, 10, minimum_node_size, radius_multiplier, colors, rest_color)
 
 # Initiate the html output string.
 html_string = ''
