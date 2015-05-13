@@ -2357,8 +2357,9 @@ transversions_only = args.transversions_only
 haploid = args.haploid
 
 # Initialize the random number generator if a seed value has been provided.
-if seed != -1:
-    random.seed(seed)
+if seed == -1:
+    seed = random.randint(0, 99999)
+random.seed(seed)
 
 # Make sure sensible values are specified for the window start and end.
 if window_start_pos < 0:
@@ -2721,6 +2722,10 @@ if transversions_only:
     html_string += str(total_fitch_distance) + ' transversions</td>\n'
 else:
     html_string += str(total_fitch_distance) + ' substitutions</td>\n'
+html_string += '              </tr>\n'
+html_string += '              <tr>\n'
+html_string += '                <td width="160" style="font-weight:bold">Random number seed</td>\n'
+html_string += '                <td>' + str(seed) + '</td>\n'
 html_string += '              </tr>\n'
 html_string += '            </table>\n'
 html_string += '          </td>\n'
