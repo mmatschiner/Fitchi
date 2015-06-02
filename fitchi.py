@@ -79,7 +79,10 @@ class Tree(object):
                 self.newick_string = self.newick_string[1:newick_string_tail_start_pos+1]
 
         # Parse the bifurcating part of the tree.
-        pattern = re.compile("\(([a-zA-Z0-9_\.\-]+?):([\d\.Ee-]+?)\,([a-zA-Z0-9_\.\-]+?):([\d\.Ee-]+?)\)")
+        if ":" in self.newick_string:
+            pattern = re.compile("\(([a-zA-Z0-9_\.\-]+?):[\d\.Ee-]+?,([a-zA-Z0-9_\.\-]+?):[\d\.Ee-]+?\)")
+        else:
+            pattern = re.compile("\(([a-zA-Z0-9_\.\-]+?),([a-zA-Z0-9_\.\-]+?)\)")
         hit = "placeholder"
         while hit != None:
             hit = pattern.search(self.newick_string)
@@ -90,7 +93,6 @@ class Tree(object):
                 edge1 = Edge("edge" + str(number_of_edges-1) + "X")
                 self.increase_max_number_of_edges()
                 edge1.set_node_ids([internal_node_id, hit.group(1)])
-                # edge1.set_length(float(hit.group(2)))
                 node1 = Node(hit.group(1), False, self.pops)
                 node1.set_parent_id(internal_node_id)
                 if hit.group(1)[:12] == 'internalNode':
@@ -100,15 +102,14 @@ class Tree(object):
                     node1.add_record_id(hit.group(1))
                 edge2 = Edge("edge" + str(number_of_edges) + "X")
                 self.increase_max_number_of_edges()
-                edge2.set_node_ids([internal_node_id, hit.group(3)])
-                # edge2.set_length(float(hit.group(4)))
-                node2 = Node(hit.group(3), False, self.pops)
+                edge2.set_node_ids([internal_node_id, hit.group(2)])
+                node2 = Node(hit.group(2), False, self.pops)
                 node2.set_parent_id(internal_node_id)
-                if hit.group(3)[:12] == 'internalNode':
+                if hit.group(2)[:12] == 'internalNode':
                     node2.set_size(0)
                 else:
                     node2.set_size(1)
-                    node2.add_record_id(hit.group(3))
+                    node2.add_record_id(hit.group(2))
                 self.edges.append(edge1)
                 self.edges.append(edge2)
                 self.nodes.append(node1)
@@ -116,7 +117,10 @@ class Tree(object):
                 self.newick_string = self.newick_string.replace(hit.group(0), internal_node_id)
 
         # Parse the remaining string with three branches (if the tree is unrooted).
-        pattern_unrooted = re.compile("^\(([a-zA-Z0-9_\.\-]+?):([\d\.Ee-]+?),([a-zA-Z0-9_\.\-]+?):([\d\.Ee-]+?),([a-zA-Z0-9_\.\-]+?):([\d\.Ee-]+?)\)$")
+        if ":" in self.newick_string:
+            pattern_unrooted = re.compile("^\(([a-zA-Z0-9_\.\-]+?):[\d\.Ee-]+?,([a-zA-Z0-9_\.\-]+?):[\d\.Ee-]+?,([a-zA-Z0-9_\.\-]+?):[\d\.Ee-]+?\)$")
+        else:
+            pattern_unrooted = re.compile("^\(([a-zA-Z0-9_\.\-]+?),([a-zA-Z0-9_\.\-]+?),([a-zA-Z0-9_\.\-]+?)\)$")
         hit_unrooted = pattern_unrooted.search(self.newick_string)
         pattern_rooted = re.compile("^internalNode\d+X$")
         hit_rooted = pattern_rooted.search(self.newick_string)
@@ -127,20 +131,17 @@ class Tree(object):
             edge1 = Edge("edge" + str(number_of_edges-2) + "X")
             self.increase_max_number_of_edges()
             edge1.set_node_ids([root_node_id, hit_unrooted.group(1)])
-            # edge1.set_length(float(hit_unrooted.group(2)))
             edge2 = Edge("edge" + str(number_of_edges-1) + "X")
             self.increase_max_number_of_edges()
-            edge2.set_node_ids([root_node_id, hit_unrooted.group(3)])
-            # edge2.set_length(float(hit_unrooted.group(4)))
+            edge2.set_node_ids([root_node_id, hit_unrooted.group(2)])
             edge3 = Edge("edge" + str(number_of_edges) + "X")
             self.increase_max_number_of_edges()
-            edge3.set_node_ids([root_node_id, hit_unrooted.group(5)])
-            # edge3.set_length(float(hit_unrooted.group(6)))
+            edge3.set_node_ids([root_node_id, hit_unrooted.group(3)])
             node1 = Node(hit_unrooted.group(1), False, self.pops)
             node1.set_parent_id(root_node_id)
-            node2 = Node(hit_unrooted.group(3), False, self.pops)
+            node2 = Node(hit_unrooted.group(2), False, self.pops)
             node2.set_parent_id(root_node_id)
-            node3 = Node(hit_unrooted.group(5), False, self.pops)
+            node3 = Node(hit_unrooted.group(3), False, self.pops)
             node3.set_parent_id(root_node_id)
             node4 = Node(root_node_id, True, self.pops)
             node4.set_parent_id('None')
@@ -148,11 +149,11 @@ class Tree(object):
                 node1.set_size(0)
             else:
                 node1.set_size(1)
-            if hit_unrooted.group(3)[:12] == 'internalNode':
+            if hit_unrooted.group(2)[:12] == 'internalNode':
                 node2.set_size(0)
             else:
                 node2.set_size(1)
-            if hit_unrooted.group(5)[:12] == 'internalNode':
+            if hit_unrooted.group(3)[:12] == 'internalNode':
                 node3.set_size(0)
             else:
                 node3.set_size(1)
@@ -2279,7 +2280,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 0.995')
+    version='%(prog)s 1.0')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
