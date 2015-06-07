@@ -1160,6 +1160,7 @@ class Tree(object):
             return 1
         else:
             for node in self.nodes:
+                # print(node.info())
                 if 'internalNode' in node.get_id():
                     if node.extant_progeny_ids_contain_all_of(pop_terminals):
                         number_of_nodes_actually_required = 1
@@ -1177,6 +1178,23 @@ class Tree(object):
                                     if anti_progeny_node.get_is_root() == False:
                                         if anti_progeny_node.extant_progeny_ids_contain_any_of(pop_terminals):
                                             number_of_nodes_actually_required += 1
+                        # Check whether the root is also required.
+                        number_of_root_children_with_any_pop_terminals = 0
+                        for root in self.nodes:
+                            if root.get_is_root():
+                                for root_child_id in root.get_child_ids():
+                                    for child in self.nodes:
+                                        if child.get_id() == root_child_id:
+                                            if 'internalNode' in child.get_id():
+                                                if child.extant_progeny_ids_contain_any_of(pop_terminals):
+                                                    number_of_root_children_with_any_pop_terminals += 1
+                                            else:
+                                                if pop in child.get_id():
+                                                    number_of_root_children_with_any_pop_terminals += 1
+                                            break
+                                break
+                        if number_of_root_children_with_any_pop_terminals > 1:
+                            number_of_nodes_actually_required += 1
                     else:
                         number_of_nodes_actually_required = None
                     if number_of_nodes_actually_required != None:
@@ -2280,7 +2298,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 1.0')
+    version='%(prog)s 1.01')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
