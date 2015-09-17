@@ -1,6 +1,6 @@
 #!/usr/local/bin/python3
 
-# Michael Matschiner, 2015-05-12
+# Michael Matschiner, 2015-09-17
 # michaelmatschiner@mac.com
 
 # Import libraries and make sure we're on python 3.
@@ -2298,7 +2298,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 1.01')
+    version='%(prog)s 1.02')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
@@ -2453,17 +2453,29 @@ if inlines[0][0:6].lower() == '#nexus':
     in_tree = False
     records = []
     for line in inlines:
-        if line.lower().strip() == 'matrix':
+        clean_line = line.strip()
+        if "[" in clean_line and "]" in clean_line:
+            tmp = ""
+            in_comment = False
+            for letter in clean_line:
+                if letter == "[":
+                    in_comment = True
+                elif letter == "]":
+                    in_comment = False
+                elif in_comment == False:
+                    tmp += letter
+            clean_line = tmp
+        if clean_line.lower() == 'matrix':
             in_matrix = True
-        elif line.strip() == ';':
+        elif clean_line == ';':
             in_matrix = False
             in_tree = False
-        elif "format" in line.strip().lower():
-            if "interleave" in line.strip().lower():
+        elif "format" in clean_line.lower():
+            if "interleave" in clean_line.lower():
                 print("ERROR: Could not parse the alignment (should be sequential nexus format, but the format specification says that it is interleaved)!")
                 sys.exit(1)
-        elif in_matrix and line.strip() is not '':
-            line_ary = line.split()
+        elif in_matrix and clean_line is not '':
+            line_ary = clean_line.split()
             if len(line_ary) == 1:
                 print("ERROR: Could not parse the alignment (should be sequential nexus format, but looks like it is interleaved)!")
                 sys.exit(1)
