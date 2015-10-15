@@ -1,6 +1,6 @@
 #!/usr/local/bin/python3
 
-# Michael Matschiner, 2015-09-17
+# Michael Matschiner, 2015-10-15
 # michaelmatschiner@mac.com
 
 # Import libraries and make sure we're on python 3.
@@ -14,21 +14,131 @@ import random
 import tempfile
 import os
 import re
-import networkx as nx
 import math
 import scipy
 import pygraphviz
 from scipy import special
-from subprocess import call
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Align import MultipleSeqAlignment
 from Bio.Alphabet import generic_dna
-from Bio import AlignIO, Nexus, Phylo
-from Bio.Seq import Seq
-from Bio.SeqRecord import SeqRecord
-from Bio.Align import MultipleSeqAlignment
-from Bio.Alphabet import generic_dna
+
+######################### networkx 2.0 Graph class source below #########################
+
+#    Copyright (C) 2004-2015 by
+#    Aric Hagberg <hagberg@lanl.gov>
+#    Dan Schult <dschult@colgate.edu>
+#    Pieter Swart <swart@lanl.gov>
+#    All rights reserved.
+#    BSD license.
+
+class Graph(object):
+    node_dict_factory = dict
+    adjlist_dict_factory = dict
+    edge_attr_dict_factory = dict
+
+    def __init__(self, data=None, **attr):
+        self.node_dict_factory = ndf = self.node_dict_factory
+        self.adjlist_dict_factory = self.adjlist_dict_factory
+        self.edge_attr_dict_factory = self.edge_attr_dict_factory
+
+        self.graph = {}   # dictionary for graph attributes
+        self.node = ndf()  # empty node attribute dict
+        self.adj = ndf()  # empty adjacency dict
+        # attempt to load graph with data
+        if data is not None:
+            convert.to_networkx_graph(data, create_using=self)
+        # load graph attributes (must be after convert)
+        self.graph.update(attr)
+        self.edge = self.adj
+
+    @property
+    def name(self):
+        return self.graph.get('name', '')
+
+    @name.setter
+    def name(self, s):
+        self.graph['name'] = s
+
+    def __iter__(self):
+        return iter(self.node)
+
+    def add_node(self, n, attr_dict=None, **attr):
+        # set up attribute dict
+        if attr_dict is None:
+            attr_dict = attr
+        else:
+            try:
+                attr_dict.update(attr)
+            except AttributeError:
+                raise NetworkXError(
+                    "The attr_dict argument must be a dictionary.")
+        if n not in self.node:
+            self.adj[n] = self.adjlist_dict_factory()
+            self.node[n] = attr_dict
+        else:  # update attr even if node already exists
+            self.node[n].update(attr_dict)
+
+    def nodes_iter(self, data=False):
+        if data:
+            return iter(self.node.items())
+        return iter(self.node)
+
+    def nodes(self, data=False):
+        return list(self.nodes_iter(data=data))
+
+    def add_edge(self, u, v, attr_dict=None, **attr):
+        # set up attribute dictionary
+        if attr_dict is None:
+            attr_dict = attr
+        else:
+            try:
+                attr_dict.update(attr)
+            except AttributeError:
+                raise NetworkXError(
+                    "The attr_dict argument must be a dictionary.")
+        # add nodes
+        if u not in self.node:
+            self.adj[u] = self.adjlist_dict_factory()
+            self.node[u] = {}
+        if v not in self.node:
+            self.adj[v] = self.adjlist_dict_factory()
+            self.node[v] = {}
+        # add the edge
+        datadict = self.adj[u].get(v, self.edge_attr_dict_factory())
+        datadict.update(attr_dict)
+        self.adj[u][v] = datadict
+        self.adj[v][u] = datadict
+
+    def edges_iter(self, nbunch=None, data=False, default=None):
+        seen = {}     # helper dict to keep track of multiply stored edges
+        if nbunch is None:
+            nodes_nbrs = self.adj.items()
+        else:
+            nodes_nbrs = ((n, self.adj[n]) for n in self.nbunch_iter(nbunch))
+        if data is True:
+            for n, nbrs in nodes_nbrs:
+                for nbr, ddict in nbrs.items():
+                    if nbr not in seen:
+                        yield (n, nbr, ddict)
+                seen[n] = 1
+        elif data is not False:
+            for n, nbrs in nodes_nbrs:
+                for nbr, ddict in nbrs.items():
+                    if nbr not in seen:
+                        d = ddict[data] if data in ddict else default
+                        yield (n, nbr, d)
+                seen[n] = 1
+        else:  # data is False
+            for n, nbrs in nodes_nbrs:
+                for nbr in nbrs:
+                    if nbr not in seen:
+                        yield (n, nbr)
+                seen[n] = 1
+        del seen
+
+######################### networkx 2.0 Graph class source above #########################
+
 
 # The Tree class.
 class Tree(object):
@@ -642,14 +752,40 @@ class Tree(object):
             node.set_per_pop_sizes(self.pops)
 
     def position(self, algorithm, minimum_node_size, radius_multiplier):
-        G = nx.Graph()
+        # Make a graph object from node and edge info.
+        G = Graph()
         for node in self.nodes:
             G.add_node(node.get_id())
         for edge in self.edges:
             node_ids = edge.get_node_ids()
             G.add_edge(node_ids[0], node_ids[1])
-        pos = nx.graphviz_layout(G, prog=algorithm, root=None)
 
+        # Code below modified from networkx source.
+        # This uses pygraphviz and neato to place nodes.
+        A=pygraphviz.AGraph(name=G.name,strict=True,directed=False)
+        # Default graph attributes
+        A.graph_attr.update(G.graph.get('graph',{}))
+        A.node_attr.update(G.graph.get('node',{}))
+        A.edge_attr.update(G.graph.get('edge',{}))
+        # Add nodes
+        for n,nodedata in G.nodes(data=True):
+            A.add_node(n,**nodedata)
+        # Loop over edges
+        for u,v,edgedata in G.edges_iter(data=True):
+            str_edgedata=dict((k,str(v)) for k,v in edgedata.items())
+            A.add_edge(u,v,**str_edgedata)
+        A.layout(prog='neato')
+        pos={}
+        for n in G:
+            node=pygraphviz.Node(A,n)
+            try:
+                xx,yy=node.attr["pos"].split(',')
+                pos[n]=(float(xx),float(yy))
+            except:
+                print("no position for node",n)
+                pos[n]=(0.0,0.0)
+        
+        # Define edges based on node positions.
         for edge in self.edges:
             edge_node_ids = edge.get_node_ids()
             for node_id, coordinates in pos.items():
