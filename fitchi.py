@@ -2434,7 +2434,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 1.02')
+    version='%(prog)s 1.1')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
