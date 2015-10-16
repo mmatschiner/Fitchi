@@ -85,7 +85,7 @@ class Graph(object):
         return iter(self.node)
 
     def nodes(self, data=False):
-        return list(self.nodes_iter(data=data))
+        return sorted(list(self.nodes_iter(data=data)))
 
     def add_edge(self, u, v, attr_dict=None, **attr):
         # set up attribute dictionary
@@ -116,6 +116,7 @@ class Graph(object):
             nodes_nbrs = self.adj.items()
         else:
             nodes_nbrs = ((n, self.adj[n]) for n in self.nbunch_iter(nbunch))
+            nodes_nbrs = sorted(nodes_nbrs)
         if data is True:
             for n, nbrs in nodes_nbrs:
                 for nbr, ddict in nbrs.items():
@@ -2434,7 +2435,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 1.1')
+    version='%(prog)s 1.1.1')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
@@ -2573,11 +2574,23 @@ elif len(pops) == 8:
 elif len(pops) == 9:
     # yellow, green, cyan, blue, violet, magenta, red, orange, base03
     colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16', '002b36']
-elif len(pops) > 9:
-    # yellow, green, cyan, blue, violet, magenta, red, orange, base03, base01
-    colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16', '002b36', '586e75']
-# base1
-rest_color = '93a1a1'
+elif len(pops) == 10:
+    # yellow, green, cyan, blue, violet, magenta, red, orange, base03, base0
+    colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16', '002b36', '839496']
+elif len(pops) == 11:
+    # yellow, green, cyan, blue, violet, magenta, red, orange, base03, base00, base2
+    colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16', '002b36', '657b83', 'eee8d5']
+elif len(pops) == 12:
+    # yellow, green, cyan, blue, violet, magenta, red, orange, base03, base01, base0, base2
+    colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16', '002b36', '586e75', '839496', 'eee8d5']
+elif len(pops) == 13:
+    # yellow, green, cyan, blue, violet, magenta, red, orange, base03, base01, base0, base0base2_mix1, base2
+    colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16', '002b36', '586e75', '839496', 'b5bab3', 'eee8d5']
+elif len(pops) > 13:
+    # yellow, green, cyan, blue, violet, magenta, red, orange, base03, base01, base0, base0base2_mix2, base0base2_mix3
+    colors = ['859900', 'b58900', '2aa198', '268bd2', '6c71c4', 'd33682', 'dc322f', 'cb4b16', '002b36', '586e75', '839496', 'a2aca8', 'c6c6bc']
+# base2
+rest_color = 'eee8d5'
 
 # Parse the input.
 align = None
