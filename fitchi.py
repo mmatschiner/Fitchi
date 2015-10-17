@@ -110,32 +110,15 @@ class Graph(object):
         self.adj[u][v] = datadict
         self.adj[v][u] = datadict
 
+    # Function edges_iter is modified to allow reproducibility with the same seed.
     def edges_iter(self, nbunch=None, data=False, default=None):
         seen = {}     # helper dict to keep track of multiply stored edges
-        if nbunch is None:
-            nodes_nbrs = self.adj.items()
-        else:
-            nodes_nbrs = ((n, self.adj[n]) for n in self.nbunch_iter(nbunch))
-            nodes_nbrs = sorted(nodes_nbrs)
-        if data is True:
-            for n, nbrs in nodes_nbrs:
-                for nbr, ddict in nbrs.items():
-                    if nbr not in seen:
-                        yield (n, nbr, ddict)
-                seen[n] = 1
-        elif data is not False:
-            for n, nbrs in nodes_nbrs:
-                for nbr, ddict in nbrs.items():
-                    if nbr not in seen:
-                        d = ddict[data] if data in ddict else default
-                        yield (n, nbr, d)
-                seen[n] = 1
-        else:  # data is False
-            for n, nbrs in nodes_nbrs:
-                for nbr in nbrs:
-                    if nbr not in seen:
-                        yield (n, nbr)
-                seen[n] = 1
+        nodes_nbrs = sorted(self.adj.items())
+        for n, nbrs in nodes_nbrs:
+            for nbr, ddict in sorted(nbrs.items()):
+                if nbr not in seen:
+                    yield (n, nbr, ddict)
+            seen[n] = 1
         del seen
 
 ######################### networkx 2.0 Graph class source above #########################
@@ -396,9 +379,9 @@ class Tree(object):
                             for child in children:
                                 children_state_sets.append(child.get_state_set(x))
                             if len(children_state_sets) == 2:
-                                intersection = list(set.intersection(set(children_state_sets[0]),set(children_state_sets[1])))
+                                intersection = sorted(list(set.intersection(set(children_state_sets[0]),set(children_state_sets[1]))))
                             elif len(children_state_sets) == 3:
-                                intersection = list(set.intersection(set(children_state_sets[0]),set(children_state_sets[1]),set(children_state_sets[2])))
+                                intersection = sorted(list(set.intersection(set(children_state_sets[0]),set(children_state_sets[1]),set(children_state_sets[2]))))
                             else:
                                 print('WARNING: An unexpected number of child state sets was encountered.')
                             if len(intersection) == 0:
@@ -407,7 +390,7 @@ class Tree(object):
                                 for children_state_set in children_state_sets:
                                     for children_state in children_state_set:
                                         flat_children_state_sets.append(children_state)
-                                state_set = list(set(flat_children_state_sets))
+                                state_set = sorted(list(set(flat_children_state_sets)))
                             else:
                                 state_set = intersection
                             node.set_state_set(x, state_set)
@@ -450,7 +433,8 @@ class Tree(object):
                             elif node.get_sequences()[0][x] == '-':
                                 state_set = ['A','C','G','T']
                             else:
-                                print(node.get_sequences()[0][x])
+                                print("ERROR: Unknown character: " + node.get_sequences()[0][x])
+                                sys.exit(1)
                             node.set_state_set(x, state_set)
             invest_dist -= 1
 
@@ -775,7 +759,7 @@ class Tree(object):
         for u,v,edgedata in G.edges_iter(data=True):
             str_edgedata=dict((k,str(v)) for k,v in edgedata.items())
             A.add_edge(u,v,**str_edgedata)
-        A.layout(prog='neato')
+        A.layout(prog=algorithm)
         pos={}
         for n in G:
             node=pygraphviz.Node(A,n)
@@ -785,7 +769,7 @@ class Tree(object):
             except:
                 print("no position for node",n)
                 pos[n]=(0.0,0.0)
-        
+
         # Define edges based on node positions.
         for edge in self.edges:
             edge_node_ids = edge.get_node_ids()
@@ -1297,7 +1281,6 @@ class Tree(object):
             return 1
         else:
             for node in self.nodes:
-                # print(node.info())
                 if 'internalNode' in node.get_id():
                     if node.extant_progeny_ids_contain_all_of(pop_terminals):
                         number_of_nodes_actually_required = 1
@@ -2435,7 +2418,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 1.1.1')
+    version='%(prog)s 1.1.2')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
