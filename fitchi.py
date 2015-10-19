@@ -2423,7 +2423,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 1.1.3')
+    version='%(prog)s 1.1.4')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
@@ -2713,7 +2713,10 @@ html_string += '"http://www.w3.org/TR/html4/loose.dtd">\n'
 html_string += '<html>\n'
 html_string += '  <head>\n'
 html_string += '    <title>Fitchi results</title>\n'
-html_string += '    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">\n'
+html_string += '    <meta http-equiv="Content-Type" content="text/html; charset="utf-8">\n'
+html_string += '    <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">\n'
+html_string += '    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>\n'
+html_string += '    <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>\n'
 html_string += '\n'
 html_string += '    <style type="text/css">\n'
 html_string += '      a:link { text-decoration:none; color:#000000; }\n'
@@ -2731,6 +2734,7 @@ html_string += '      tr.smallSpaceUnder > td { padding-bottom: 0.2em; }\n'
 html_string += '      tr.spaceOver > td { padding-top: 1em; }\n'
 html_string += '      tr.spaceOverAndLargeSpaceUnder > td { padding-top: 1em; padding-bottom: 8em; }\n'
 html_string += '    </style>\n'
+html_string += '\n'
 html_string += '    <script type="text/javascript">\n'
 html_string += '      <!--\n'
 html_string += '        function legend_toggle () {\n'
@@ -2751,6 +2755,12 @@ html_string += '            document.getElementById("hide").style.display = "non
 html_string += '          }\n'
 html_string += '        }\n'
 html_string += '      //-->\n'
+html_string += '    </script>\n'
+html_string += '\n'
+html_string += '    <script>\n'
+html_string += '    $(document).ready(function(){\n'
+html_string += '      $(\'[data-toggle="tooltip"]\').tooltip();\n'
+html_string += '    });\n'
 html_string += '    </script>\n'
 html_string += '  </head>\n'
 html_string += '\n'
@@ -2847,7 +2857,7 @@ html_string += '        </tr>\n'
 
 # The haplotype genealogy section.
 html_string += '        <tr class="smallSpaceUnder">\n'
-html_string += '          <td style="font-size:30px; font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/j.1365-294X.2011.05066.x/abstract">Haplotype genealogy</a></td>\n'
+html_string += '          <td style="font-size:30px; font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/j.1365-294X.2011.05066.x/abstract">Haplotype genealogy graph</a></td>\n'
 html_string += '        </tr>\n'
 html_string += '        <tr class="spaceUnder">\n'
 html_string += '          <td>\n'
@@ -2920,10 +2930,10 @@ if len(tree.get_nodes()) > 0:
     html_string += '        <tr class="spaceOver">\n'
     html_string += '          <td style="font-weight:bold">\n'
     html_string += '            <span id="show" style="display:inline">\n'
-    html_string += '              <button onclick="legend_toggle()">Show legend</button>\n'
+    html_string += '              <button type="button" class="btn btn-default btn-xs" onclick="legend_toggle()">Show legend</button> \n'
     html_string += '            </span>\n'
     html_string += '            <span id="hide" style="display:none">\n'
-    html_string += '              <button onclick="legend_toggle()">Hide legend</button>\n'
+    html_string += '              <button type="button" class="btn btn-default btn-xs" onclick="legend_toggle()">Hide legend</button>\n'
     html_string += '            </span>\n'
     html_string += '          </td>\n'
     html_string += '        </tr>\n'
@@ -2935,9 +2945,9 @@ if pops != []:
     html_string += '                <table width="800" cellpadding="0" cellspacing="1">\n'
     html_string += '                  <tr class="spaceOver">\n'
     html_string += '                    <td width="160" style="font-weight:bold; font-family:Courier">Population</td>\n'
-    html_string += '                    <td width="80" style="font-weight:bold; font-family:Courier" colspan="2">Color</td>\n'
-    html_string += '                    <td width="250" style="font-weight:bold; font-family:Courier"># Nodes with population presence</td>\n'
-    html_string += '                    <td width="210" style="font-weight:bold; font-family:Courier">% Presence in non-empty nodes</td>\n'
+    html_string += '                    <td width="100" style="font-weight:bold; font-family:Courier" colspan="2">Color</td>\n'
+    html_string += '                    <td width="300" style="font-weight:bold; font-family:Courier"># Nodes with population presence</td>\n'
+    html_string += '                    <td width="240" style="font-weight:bold; font-family:Courier">% Presence in non-empty nodes</td>\n'
     html_string += '                  </tr>\n'
     pop_count = 0
     for pop in pops:
@@ -2947,7 +2957,7 @@ if pops != []:
             html_string += '                    <td width="40" bgcolor="#' + rest_color + '"></td>\n'
         else:
             html_string += '                    <td width="40" bgcolor="#' + colors[pop_count] + '"></td>\n'
-        html_string += '                    <td width="40"></td>\n'
+        html_string += '                    <td width="60"></td>\n'
         node_count_with_pop = 0
         non_empty_node_count = 0
         for node in tree.get_nodes():
@@ -3049,7 +3059,7 @@ html_string += '                <td width="168" style="font-weight:bold">Populat
 html_string += '                <td width="168" style="font-weight:bold">Variable sites</td>\n'
 html_string += '                <td width="168" style="font-weight:bold">Invariable sites</td>\n'
 html_string += '                <td width="168" style="font-weight:bold">Proportion variable</td>\n'
-html_string += '                <td width="168" style="font-weight:bold">&pi;</td>\n'
+html_string += '                <td width="168" style="font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12842/abstract" data-toggle="tooltip" title="probability that two randomly chosen sequences from the sample have different alleles at a SNP (see Ruegg et al. 2014)">&pi;&nbsp;&nbsp;</a></td>\n'
 html_string += '              </tr>\n'
 html_string += '              <tr>\n'
 html_string += '                <td width="168" style="font-weight:bold">All</td>\n'
@@ -3088,9 +3098,9 @@ if pops != None and len(pops) > 1:
     html_string += '              <tr>\n'
     html_string += '                <td width="168" style="font-weight:bold">Population 1</td>\n'
     html_string += '                <td width="168" style="font-weight:bold">Population 2</td>\n'
-    html_string += '                <td width="168" style="font-weight:bold"><a href="http://www.jstor.org/stable/2408641">F<sub>ST</sub></a></td>\n'
-    html_string += '                <td width="168" style="font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12842/abstract">d<sub>XY</a></td>\n'
-    html_string += '                <td width="168" style="font-weight:bold">d<sub>f</td>\n'
+    html_string += '                <td width="168" style="font-weight:bold"><a href="http://www.jstor.org/stable/2408641" data-toggle="tooltip" title="fixation index estimator (Weir and Cockerham 1984)">F<sub>ST</sub>&nbsp;&nbsp;</a></td>\n'
+    html_string += '                <td width="168" style="font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12842/abstract" data-toggle="tooltip" title="between-species average number of pairwise differences (see Ruegg et al. 2014)">d<sub>XY</sub>&nbsp;&nbsp;</a></td>\n'
+    html_string += '                <td width="168" style="font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12842/abstract" data-toggle="tooltip" title="density of fixed differences per base pair (see Ruegg et al. 2014)">d<sub>f</sub>&nbsp;&nbsp;</a></td>\n'
     html_string += '              </tr>\n'
     for x in range(0,len(pops)-1):
         for y in range(x+1,len(pops)):
@@ -3139,7 +3149,7 @@ if len(pops) > 0:
     html_string += '            <table width="840" border="0" cellpadding="0" cellspacing="1">\n'
     html_string += '              <tr>\n'
     html_string += '                <td width="168" style="font-weight:bold">Population</td>\n'
-    html_string += '                <td width="672" style="font-weight:bold"><a href="http://www.bioone.org/doi/abs/10.1111/j.1558-5646.2008.00442.x">gsi</a></td>\n'
+    html_string += '                <td width="672" style="font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/j.1558-5646.2008.00442.x/abstract" data-toggle="tooltip" title="genealogical sorting index (Cummings et al. 2008)">gsi&nbsp;&nbsp;</a></td>\n'
     html_string += '              </tr>\n'
     for x in range(0,len(pops)):
         html_string += '              <tr>\n'
