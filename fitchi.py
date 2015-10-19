@@ -1,7 +1,9 @@
 #!/usr/local/bin/python3
-
-# Michael Matschiner, 2015-10-15
-# michaelmatschiner@mac.com
+#
+#    Copyright (C) 2014-2015 by
+#    Michael Matschiner (michaelmatschiner@mac.com)
+#    All rights reserved.
+#    BSD license.
 
 # Import libraries and make sure we're on python 3.
 import sys
@@ -24,7 +26,10 @@ from Bio.Align import MultipleSeqAlignment
 from Bio.Alphabet import generic_dna
 
 ######################### networkx 2.0 Graph class source below #########################
-
+#
+# Class copied with modifications from networkx (https://networkx.github.io)
+# Original copy right information for this class given below.
+#
 #    Copyright (C) 2004-2015 by
 #    Aric Hagberg <hagberg@lanl.gov>
 #    Dan Schult <dschult@colgate.edu>
@@ -2418,7 +2423,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 1.1.2')
+    version='%(prog)s 1.1.3')
 parser.add_argument(
     '-p', '--populations',
     nargs='*',
