@@ -3059,7 +3059,7 @@ html_string += '                <td width="168" style="font-weight:bold">Populat
 html_string += '                <td width="168" style="font-weight:bold">Variable sites</td>\n'
 html_string += '                <td width="168" style="font-weight:bold">Invariable sites</td>\n'
 html_string += '                <td width="168" style="font-weight:bold">Proportion variable</td>\n'
-html_string += '                <td width="168" style="font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12842/abstract" data-toggle="tooltip" title="probability that two randomly chosen sequences from the sample have different alleles at a SNP (see Ruegg et al. 2014)">&pi;&nbsp;&nbsp;</a></td>\n'
+html_string += '                <td width="168" style="font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12842/abstract" data-toggle="tooltip" data-html="true" title="probability that two randomly chosen sequences from the sample have different alleles<br/>at a SNP<br/>(see Ruegg et al. 2014)">&pi;&nbsp;&nbsp;</a></td>\n'
 html_string += '              </tr>\n'
 html_string += '              <tr>\n'
 html_string += '                <td width="168" style="font-weight:bold">All</td>\n'
@@ -3098,9 +3098,9 @@ if pops != None and len(pops) > 1:
     html_string += '              <tr>\n'
     html_string += '                <td width="168" style="font-weight:bold">Population 1</td>\n'
     html_string += '                <td width="168" style="font-weight:bold">Population 2</td>\n'
-    html_string += '                <td width="168" style="font-weight:bold"><a href="http://www.jstor.org/stable/2408641" data-toggle="tooltip" title="fixation index estimator (Weir and Cockerham 1984)">F<sub>ST</sub>&nbsp;&nbsp;</a></td>\n'
-    html_string += '                <td width="168" style="font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12842/abstract" data-toggle="tooltip" title="between-species average number of pairwise differences (see Ruegg et al. 2014)">d<sub>XY</sub>&nbsp;&nbsp;</a></td>\n'
-    html_string += '                <td width="168" style="font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12842/abstract" data-toggle="tooltip" title="density of fixed differences per base pair (see Ruegg et al. 2014)">d<sub>f</sub>&nbsp;&nbsp;</a></td>\n'
+    html_string += '                <td width="168" style="font-weight:bold"><a href="http://www.jstor.org/stable/2408641" data-toggle="tooltip" data-html="true" title="fixation index estimator<br/>(Weir and Cockerham 1984)">F<sub>ST</sub>&nbsp;&nbsp;</a></td>\n'
+    html_string += '                <td width="168" style="font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12842/abstract" data-toggle="tooltip" data-html="true" title="between-species average number of pairwise differences<br/>(see Ruegg et al. 2014)">d<sub>XY</sub>&nbsp;&nbsp;</a></td>\n'
+    html_string += '                <td width="168" style="font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/mec.12842/abstract" data-toggle="tooltip" data-html="true" title="density of fixed differences<br/>per base pair<br/>(see Ruegg et al. 2014)">d<sub>f</sub>&nbsp;&nbsp;</a></td>\n'
     html_string += '              </tr>\n'
     for x in range(0,len(pops)-1):
         for y in range(x+1,len(pops)):
@@ -3149,7 +3149,7 @@ if len(pops) > 0:
     html_string += '            <table width="840" border="0" cellpadding="0" cellspacing="1">\n'
     html_string += '              <tr>\n'
     html_string += '                <td width="168" style="font-weight:bold">Population</td>\n'
-    html_string += '                <td width="672" style="font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/j.1558-5646.2008.00442.x/abstract" data-toggle="tooltip" title="genealogical sorting index (Cummings et al. 2008)">gsi&nbsp;&nbsp;</a></td>\n'
+    html_string += '                <td width="672" style="font-weight:bold"><a href="http://onlinelibrary.wiley.com/doi/10.1111/j.1558-5646.2008.00442.x/abstract" data-toggle="tooltip" data-html="true" title="genealogical sorting index<br/>(Cummings et al. 2008)">gsi&nbsp;&nbsp;</a></td>\n'
     html_string += '              </tr>\n'
     for x in range(0,len(pops)):
         html_string += '              <tr>\n'
