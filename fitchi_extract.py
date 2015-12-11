@@ -181,21 +181,21 @@ if extract in ['svg', 'svg_simple', 'svg_bw', 'svg_simple_bw']:
 	svg_string = ''
 	for svg_line in svg_lines[1:-1]:
 		if extract in ['svg_bw', 'svg_simple_bw']:
-		svg_legend_string = svg_legend_string.replace('859900','000000')
-		svg_legend_string = svg_legend_string.replace('b58900','dfdfdf')
-		svg_legend_string = svg_legend_string.replace('2aa198','6f6f6f')
-		svg_legend_string = svg_legend_string.replace('268bd2','2f2f2f')
-		svg_legend_string = svg_legend_string.replace('6c71c4','afafaf')
-		svg_legend_string = svg_legend_string.replace('d33682','4f4f4f')
-		svg_legend_string = svg_legend_string.replace('dc322f','8f8f8f')
-		svg_legend_string = svg_legend_string.replace('cb4b16','0f0f0f')
-		svg_legend_string = svg_legend_string.replace('002b36','cfcfcf')
-		svg_legend_string = svg_legend_string.replace('586e75','1f1f1f')
-		svg_legend_string = svg_legend_string.replace('839496','3f3f3f')
-		svg_legend_string = svg_legend_string.replace('a2aca8','5f5f5f')
-		svg_legend_string = svg_legend_string.replace('c6c6bc','7f7f7f')
-		svg_legend_string = svg_legend_string.replace('657b83','9f9f9f')
-		svg_legend_string = svg_legend_string.replace('b5bab3','bfbfbf')
+			svg_legend_string = svg_legend_string.replace('859900','000000')
+			svg_legend_string = svg_legend_string.replace('b58900','dfdfdf')
+			svg_legend_string = svg_legend_string.replace('2aa198','6f6f6f')
+			svg_legend_string = svg_legend_string.replace('268bd2','2f2f2f')
+			svg_legend_string = svg_legend_string.replace('6c71c4','afafaf')
+			svg_legend_string = svg_legend_string.replace('d33682','4f4f4f')
+			svg_legend_string = svg_legend_string.replace('dc322f','8f8f8f')
+			svg_legend_string = svg_legend_string.replace('cb4b16','0f0f0f')
+			svg_legend_string = svg_legend_string.replace('002b36','cfcfcf')
+			svg_legend_string = svg_legend_string.replace('586e75','1f1f1f')
+			svg_legend_string = svg_legend_string.replace('839496','3f3f3f')
+			svg_legend_string = svg_legend_string.replace('a2aca8','5f5f5f')
+			svg_legend_string = svg_legend_string.replace('c6c6bc','7f7f7f')
+			svg_legend_string = svg_legend_string.replace('657b83','9f9f9f')
+			svg_legend_string = svg_legend_string.replace('b5bab3','bfbfbf')
 		if extract in ['svg_simple', 'svg_simple_bw']:
 			if '<radialGradient id="radgrad"' in svg_line:
 				include_svg_line = False
