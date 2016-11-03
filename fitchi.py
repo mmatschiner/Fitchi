@@ -2635,9 +2635,9 @@ if inlines[0][0:6].lower() == '#nexus':
                     Seq(seq_string,
                         generic_dna),
                         id = line_ary[0]))
-        elif line.strip() == 'begin trees;':
+        elif line.strip().lower() == 'begin trees;':
             in_tree = True
-        elif line.strip() == 'end;':
+        elif line.strip().lower() == 'end;':
             in_tree = False
         elif in_tree and line.strip() is not '':
             tree_string_raw = line
