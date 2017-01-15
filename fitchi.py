@@ -859,6 +859,54 @@ class Tree(object):
             invest_dist += 1
         self.is_positioned = True
 
+    def get_overlap(self, minimum_node_size, radius_multiplier):
+        overlap = 0
+        if len(self.nodes) > 1:
+            index = 0
+            for node in self.nodes:
+                index += 1
+                for other_node in self.nodes[index:len(self.nodes)]:
+                    x1 = node.get_x()
+                    y1 = node.get_y()
+                    r1 = node.get_radius(minimum_node_size)*radius_multiplier
+                    x2 = other_node.get_x()
+                    y2 = other_node.get_y()
+                    r2 = other_node.get_radius(minimum_node_size)*radius_multiplier
+                    delta_x = (x1-x2)**2
+                    delta_y = (y1-y2)**2
+                    d = math.sqrt(delta_x + delta_y)
+                    if r2 > r1:
+                        r1,r2 = r2,r1 # This makes r1 the larger circle.
+                    if d < r1 - r2: # Case 1: The smaller circle is completely within the larger.
+                        overlap = math.pi * r2**2
+                    elif d < math.sqrt(r1**2 - r2**2): # Case 2: The center of the smaller circle is within the larger, but it extends over the boundary of the larger one.
+                        # Equations from http://mathworld.wolfram.com/Circle-CircleIntersection.html
+                        p1 = (d**2 + r1**2 - r2**2)/(2 * d * r1)
+                        p2 = (d**2 + r2**2 - r1**2)/(2 * d * r2)
+                        under_root = (-d + r1 + r2) * (d + r1 - r2) * (d - r1 + r2) * (d + r1 + r2)
+                        overlap = r1**2 * math.acos(p1) + r2**2 * math.acos(p2) - 0.5 * math.sqrt(under_root)
+                        # As a sanity check, make sure that the result is between 0.5 and 1.0 times the smaller node area.
+                        if overlap < 0.5 * math.pi * r2**2:
+                            print("ERROR: Overlap between nodes could not be calculated!")
+                            print("  Calculated overlap: ",overlap)
+                            print("  Radius of larger node: ",r1)
+                            print("  Radius of smaller node: ",r2)
+                            print("  Node center x positions: ",x1,", ",x2)
+                            print("  Node center y positions: ",y1,", ",y2)
+                            print("  Distance between node centers: ",d)
+                            print("  Half the area of the smaller node:",0.5 * math.pi * r2**2)
+                            sys.exit(1)
+                        elif overlap > math.pi * r2**2:
+                            print("ERROR: Overlap between nodes could not be calculated!")
+                            sys.exit(1)
+                    elif d < r1 + r2: # Case 3: The circles overlap, but the centers are on both sides of the chord connecting the two intersection points.
+                        # Equations from http://mathworld.wolfram.com/Circle-CircleIntersection.html
+                        p1 = (d**2 + r1**2 - r2**2)/(2 * d * r1)
+                        p2 = (d**2 + r2**2 - r1**2)/(2 * d * r2)
+                        under_root = (-d + r1 + r2) * (d + r1 - r2) * (d - r1 + r2) * (d + r1 + r2)
+                        overlap = r1**2 * math.acos(p1) + r2**2 * math.acos(p2) - 0.5 * math.sqrt(under_root)
+        return overlap
+
     def to_svg(self, dim_x, dim_y, margin, minimum_node_size, radius_multiplier, colors, rest_color):
         if len(self.nodes) > 0:
             # Determine the two nodes with the greatest distance to each other.
@@ -2476,8 +2524,8 @@ parser.add_argument(
 parser.add_argument(
     '-m', '--radius-multiplier',
     nargs=1,
-    type=float,
-    default=[1.0],
+    type=str,
+    default=["1.0"],
     dest='radius_multiplier',
     help="Scale factor for the size of node radi (default: 1.0).")
 parser.add_argument(
@@ -2506,7 +2554,20 @@ window_start_pos = args.start[0]-1
 window_end_pos = args.end[-1]
 minimum_edge_length = args.min_edge_length[0]
 minimum_node_size = args.min_node_size[0]
-radius_multiplier = args.radius_multiplier[0]
+radius_multiplier_raw = args.radius_multiplier[0]
+if radius_multiplier_raw.lower() == "auto":
+    optimize_radius_multiplier = True
+    radius_multiplier = 10.0
+else:
+    try:
+        radius_multiplier = float(radius_multiplier_raw)
+    except ValueError:
+        print("ERROR: The radius multiplier must be either 'auto' or a number!")
+        sys.exit(1)
+    optimize_radius_multiplier = False
+    if radius_multiplier <= 0 or radius_multiplier == float("inf"):
+        print("ERROR: The radius multiplier must be either 'auto' or a number greater than 0!")
+        sys.exit(1)
 seed = args.seed[0]
 transversions_only = args.transversions_only
 haploid = args.haploid
@@ -2702,6 +2763,19 @@ tree.reduce(minimum_edge_length, minimum_node_size)
 
 # Position the tree.
 tree.position('neato', minimum_node_size, radius_multiplier)
+if optimize_radius_multiplier:
+    overlap = tree.get_overlap(minimum_node_size, radius_multiplier)
+    while overlap > 0:
+        radius_multiplier = radius_multiplier * 0.9
+        tree.position('neato', minimum_node_size, radius_multiplier)
+        overlap = tree.get_overlap(minimum_node_size, radius_multiplier)
+        if radius_multiplier < 0.001:
+            print("ERROR: No suitable radius multiplier could be found automatically.")
+            print("  Try manually setting a value for the radius multiplier.")
+            sys.exit(1)
+    radius_multiplier = radius_multiplier * 0.75
+    tree.position('neato', minimum_node_size, radius_multiplier)
+    overlap = tree.get_overlap(minimum_node_size, radius_multiplier)
 
 # Produce the svg tree string.
 svg_string = tree.to_svg(840, 700, 10, minimum_node_size, radius_multiplier, colors, rest_color)
