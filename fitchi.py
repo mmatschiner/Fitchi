@@ -270,7 +270,7 @@ class Tree(object):
             node.set_size(0)
             self.nodes.append(node)
         else:
-            print('ERROR: The newick tree string could not be parsed!')
+            print('ERROR: The newick tree string could not be parsed! This can happen when the tree contains multiple true polytomies (not just zero-length branches of bi-furcating nodes)')
             print(self.newick_string)
             sys.exit(1)
 
