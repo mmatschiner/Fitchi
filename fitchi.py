@@ -23,7 +23,6 @@ from scipy import special
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Align import MultipleSeqAlignment
-from Bio.Alphabet import generic_dna
 
 ######################### networkx 2.0 Graph class source below #########################
 #
@@ -2693,8 +2692,7 @@ if inlines[0][0:6].lower() == '#nexus':
                 seq_string = seq_string[window_start_pos:window_end_pos]
             records.append(
                 SeqRecord(
-                    Seq(seq_string,
-                        generic_dna),
+                    Seq(seq_string),
                         id = line_ary[0]))
         elif line.strip().lower() == 'begin trees;':
             in_tree = True
